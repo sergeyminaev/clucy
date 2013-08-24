@@ -120,9 +120,12 @@
 
   ([document key value meta-map]
    (.add ^Document document
-         (Field. (as-str key)
-                 value
-                 (make-field-type meta-map)))))
+         (let [field (Field. (as-str key)
+                             value
+                             (make-field-type meta-map))]
+           (if-let [boost (:boost meta-map)]
+             (.setBoost field boost))
+           field))))
 
 (defn- map-stored
   "Returns a hash-map containing all of the values in the map that

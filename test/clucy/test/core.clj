@@ -82,4 +82,13 @@
         (is (:match? exp))
         (is (string? (:description exp)))
         (is (float? (:value exp)))
-        (is (seq? (:children exp)))))))
+        (is (seq? (:children exp))))))
+
+  (testing "Boosting"
+    (let [i (memory-index)]
+      (add i
+           (with-meta {:planet "Earth Mk. II" :designer "Slartibartfast"}
+             {:name {:boost 0.0}})
+           (with-meta {:planet "Earth" :designer "Slartibartfast"}
+             {:name {:boost 1.0}}))
+      (is (= "Earth" (:planet (first (search i "Slartibartfast" 2))))))))
