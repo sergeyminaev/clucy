@@ -12,7 +12,8 @@
            (org.apache.lucene.queryparser.classic QueryParser)
            (org.apache.lucene.search BooleanClause BooleanClause$Occur
                                      BooleanQuery IndexSearcher Query ScoreDoc
-                                     Scorer TermQuery)
+                                     Scorer TermQuery
+                                     Explanation)
            (org.apache.lucene.search.highlight Highlighter QueryScorer
                                                SimpleHTMLFormatter)
            (org.apache.lucene.util Version AttributeSource)
@@ -170,6 +171,17 @@
                (meta s))
     document))
 
+(defn has-children? [exp]
+  (if-let [details (.getDetails exp)]
+    (> (alength details) 0)))
+
+(defn explain->map [^Explanation exp]
+  (conj {:description (.getDescription exp)
+          :value (.getValue exp)
+          :match? (.isMatch exp)}
+        (when (has-children? exp)
+          {:children (map explain->map (.getDetails exp))})))
+
 (defn add
   "Add hash-maps to the search index."
   [index & items]
@@ -213,19 +225,23 @@
   ([^Document document score]
      (document->map document score (constantly nil)))
   ([^Document document score highlighter]
+     (document->map document score (constantly nil) nil))
+  ([^Document document score highlighter explanation]
      (let [m (into {} (for [^Field f (.getFields document)]
                         [(keyword (.name f)) (.stringValue f)]))
            fragments (highlighter m) ; so that we can highlight :_content
            m (dissoc m :_content)]
        (with-meta
          m
-         (-> (into {}
-                   (for [^Field f (.getFields document)
-                         :let [field-type (.fieldType f)]]
-                     [(keyword (.name f)) {:stored (.stored field-type)
-                                           :tokenized (.tokenized field-type)}]))
-             (assoc :_fragments fragments :_score score)
-             (dissoc :_content))))))
+         (conj
+          (-> (into {}
+                    (for [^Field f (.getFields document)
+                          :let [field-type (.fieldType f)]]
+                      [(keyword (.name f)) {:stored (.stored field-type)
+                                            :tokenized (.tokenized field-type)}]))
+              (assoc :_fragments fragments :_score score)
+              (dissoc :_content))
+          (when explanation {:explain (explain->map explanation)}))))))
 
 (defn- make-highlighter
   "Create a highlighter function which will take a map and return highlighted
@@ -257,7 +273,7 @@ fragments."
 (defn search
   "Search the supplied index with a query string."
   [index query max-results
-   & {:keys [highlight default-field default-operator page results-per-page]
+   & {:keys [highlight default-field default-operator page results-per-page explain]
       :or {page 0 results-per-page max-results}}]
   (if (every? false? [default-field *content*])
     (throw (Exception. "No default search field specified"))
@@ -275,13 +291,16 @@ fragments."
             start (* page results-per-page)
             end (min (+ start results-per-page) (.totalHits hits))]
         (doall
-         (with-meta (for [hit (map (partial aget (.scoreDocs hits))
-                                   (range start end))]
+         (with-meta (for [[pos hit] (->> (map (partial aget (.scoreDocs hits))
+                                              (range start end))
+                                         (map-indexed vector))]
                       (document->map (.doc ^IndexSearcher searcher
                                            (.doc ^ScoreDoc hit))
                                      (.score ^ScoreDoc hit)
 
-                                     highlighter))
+                                     highlighter
+                                     (when explain
+                                       (.explain searcher query pos))))
            {:_total-hits (.totalHits hits)
             :_max-score (.getMaxScore hits)}))))))
 
