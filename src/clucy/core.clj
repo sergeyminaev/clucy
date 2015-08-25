@@ -1,5 +1,7 @@
 (ns clucy.core
-  (:import (java.io StringReader File)
+  (:import (java.io StringReader)
+           (java.nio.file Paths)
+           (java.net URI)
            (org.apache.lucene.analysis Analyzer TokenStream)
            (org.apache.lucene.analysis.standard StandardAnalyzer)
            (org.apache.lucene.document Document Field Field$Index Field$Store)
@@ -15,7 +17,7 @@
            (org.apache.lucene.store NIOFSDirectory RAMDirectory Directory)))
 
 (def ^{:dynamic true} *version* Version/LUCENE_CURRENT)
-(def ^{:dynamic true} *analyzer* (StandardAnalyzer. *version*))
+(def ^{:dynamic true} *analyzer* (StandardAnalyzer.))
 
 ;; To avoid a dependency on either contrib or 1.2+
 (defn as-str ^String [x]
@@ -34,14 +36,15 @@
 (defn disk-index
   "Create a new index in a directory on disk."
   [^String dir-path]
-  (NIOFSDirectory. (File. dir-path)))
+  (NIOFSDirectory.
+   (Paths/get (URI. (str "file:///" dir-path)))))
 
 (defn- index-writer
   "Create an IndexWriter."
   ^IndexWriter
   [index]
   (IndexWriter. index
-                (IndexWriterConfig. *version* *analyzer*)))
+                (IndexWriterConfig. *analyzer*)))
 
 (defn- index-reader
   "Create an IndexReader."
@@ -111,7 +114,7 @@
 (defn delete
   "Deletes hash-maps from the search index."
   [index & maps]
-  (with-open [writer (index-writer index)]
+  (with-open [^IndexWriter writer (index-writer index)]
     (doseq [m maps]
       (let [query (BooleanQuery.)]
         (doseq [[key value] m]
@@ -120,7 +123,7 @@
                  (TermQuery. (Term. (.toLowerCase (as-str key))
                                     (.toLowerCase (as-str value))))
                  BooleanClause$Occur/MUST)))
-        (.deleteDocuments writer query)))))
+        (.deleteDocuments writer (into-array [query]))))))
 
 (defn- document->map
   "Turn a Document object into a map."
@@ -136,8 +139,7 @@
          (-> (into {}
                    (for [^Field f (.getFields document)
                          :let [field-type (.fieldType f)]]
-                     [(keyword (.name f)) {:indexed (.indexed field-type)
-                                           :stored (.stored field-type)
+                     [(keyword (.name f)) {:stored (.stored field-type)
                                            :tokenized (.tokenized field-type)}]))
              (assoc :_fragments fragments :_score score)
              (dissoc :_content))))))
@@ -179,8 +181,7 @@ fragments."
     (with-open [reader (index-reader index)]
       (let [default-field (or default-field :_content)
             searcher (IndexSearcher. reader)
-            parser (doto (QueryParser. *version*
-                                       (as-str default-field)
+            parser (doto (QueryParser. (as-str default-field)
                                        *analyzer*)
                      (.setDefaultOperator (case (or default-operator :or)
                                             :and QueryParser/AND_OPERATOR
@@ -210,6 +211,6 @@ of the results."
        (throw (Exception. "No default search field specified"))))
   ([index query default-field]
      (with-open [writer (index-writer index)]
-       (let [parser (QueryParser. *version* (as-str default-field) *analyzer*)
+       (let [parser (QueryParser. (as-str default-field) *analyzer*)
              query  (.parse parser query)]
-         (.deleteDocuments writer query)))))
+         (.deleteDocuments writer (into-array [query]))))))
