@@ -4,7 +4,7 @@
            (java.net URI)
            (org.apache.lucene.analysis Analyzer TokenStream)
            (org.apache.lucene.analysis.standard StandardAnalyzer)
-           (org.apache.lucene.document Document Field Field$Index Field$Store)
+           (org.apache.lucene.document Document Field Field$Index Field$Store Field$TermVector)
            (org.apache.lucene.index IndexWriter IndexReader Term
                                     IndexWriterConfig DirectoryReader FieldInfo)
            (org.apache.lucene.queryparser.classic QueryParser)
@@ -21,12 +21,15 @@
 
 ;; To avoid a dependency on either contrib or 1.2+
 (defn as-str ^String [x]
-  (if (keyword? x)
-    (name x)
-    (str x)))
+  (cond
+    (keyword? x) (name x)
+    (and (fn? x) (string? (x))) (x)
+    :default (str x)))
 
 ;; flag to indicate a default "_content" field should be maintained
 (def ^{:dynamic true} *content* true)
+;; default field name
+(def ^{:dynamic true} *field-name* :_content)
 
 (defn memory-index
   "Create a new index in RAM."
@@ -39,7 +42,7 @@
   (NIOFSDirectory.
    (Paths/get (URI. (str "file:///" dir-path)))))
 
-(defn- index-writer
+(defn index-writer
   "Create an IndexWriter."
   ^IndexWriter
   [index]
@@ -52,7 +55,14 @@
   [index]
   (DirectoryReader/open ^Directory index))
 
-(defn- add-field
+(defn set-field-params [item params]
+  (with-meta
+    (if (instance? clojure.lang.IObj item)
+      item
+      #(identity item)) (into {}
+                             (map #(vector % true) params))))
+
+(defn add-field
   "Add a Field to a Document.
   Following options are allowed for meta-map:
   :stored - when false, then do not store the field value in the index.
@@ -60,21 +70,24 @@
   :analyzed - when :indexed is enabled use this option to disable/eneble Analyzer for current field.
   :norms - when :indexed is enabled user this option to disable/enable the storing of norms."
   ([document key value]
-     (add-field document key value {}))
+   (add-field document key value {}))
 
   ([document key value meta-map]
-     (.add ^Document document
-           (Field. (as-str key) (as-str value)
-                   (if (false? (:stored meta-map))
-                     Field$Store/NO
-                     Field$Store/YES)
-                   (if (false? (:indexed meta-map))
-                     Field$Index/NO
-                     (case [(false? (:analyzed meta-map)) (false? (:norms meta-map))]
-                       [false false] Field$Index/ANALYZED
-                       [true false] Field$Index/NOT_ANALYZED
-                       [false true] Field$Index/ANALYZED_NO_NORMS
-                       [true true] Field$Index/NOT_ANALYZED_NO_NORMS))))))
+   (.add ^Document document
+         (Field. (as-str key) (as-str value)
+                 (if (false? (:stored meta-map))
+                   Field$Store/NO
+                   Field$Store/YES)
+                 (if (false? (:indexed meta-map))
+                   Field$Index/NO
+                   (case [(false? (:analyzed meta-map)) (false? (:norms meta-map))]
+                     [false false] Field$Index/ANALYZED
+                     [true false] Field$Index/NOT_ANALYZED
+                     [false true] Field$Index/ANALYZED_NO_NORMS
+                     [true true] Field$Index/NOT_ANALYZED_NO_NORMS))
+                 (if (false? (:with-positions-offsets meta-map))
+                   Field$TermVector/NO
+                   Field$TermVector/WITH_POSITIONS_OFFSETS)))))
 
 (defn- map-stored
   "Returns a hash-map containing all of the values in the map that
@@ -103,13 +116,35 @@
       (add-field document :_content (concat-values map)))
     document))
 
+(defn- set->document
+  "Create a Document from a set."
+  [set]
+  (let [document (Document.)]
+    (add-field document
+               *field-name*
+               (reduce #(str %1 " " %2) "" set))
+    document))
+
+(defn- string->document
+  "Create a Document from string."
+  [s]
+  (let [document (Document.)]
+    (add-field document *field-name* s)
+    document))
+
 (defn add
   "Add hash-maps to the search index."
-  [index & maps]
+  [index & items]
   (with-open [writer (index-writer index)]
-    (doseq [m maps]
-      (.addDocument writer
-                    (map->document m)))))
+    (doseq [i items]
+      (cond
+        (map? i) (.addDocument writer
+                               (map->document i))
+        (set? i) (.addDocument writer
+                               (set->document i))
+        (and (fn? i) (string? (i))) (.addDocument
+                                     writer
+                                     (string->document i))))))
 
 (defn delete
   "Deletes hash-maps from the search index."
