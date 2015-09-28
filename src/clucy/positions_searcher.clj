@@ -42,7 +42,7 @@ from the end of the previous word to the beginning of the next word."
 
 (defn stemming-text [^String text
                      & {:keys [format] :or {format #{}}}]
-  "Convert words from dictionary set into stemmed form according to *analyzer*."
+  "Convert words from text into stemmed form according to *analyzer*."
   (let [^TokenStream ts (.tokenStream *analyzer* (as-str *field-name*) text)
         ^CharTermAttribute ta (.addAttribute ts CharTermAttribute)
         next-token (fn []
