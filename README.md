@@ -11,7 +11,7 @@ Installation
 To install Clucy, add the following dependency to your `project.clj`
 file:
 
-    [clucy "0.4.0"]
+    [org.clojars.kostafey/clucy "0.5.3"]
 
 Usage
 -----
