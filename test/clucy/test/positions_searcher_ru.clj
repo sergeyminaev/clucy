@@ -31,6 +31,13 @@
         (binding [*analyzer* (make-analyzer :ru)]
           (stemming-dict #{"пшеница" "синица" "хранится"})))))
 
+  (testing "stemming-text fn"
+    (is
+     (= '("хран" "синиц" "пшениц")
+        (binding [*analyzer* (make-analyzer :ru)]
+          (stemming-text "пшеница синица хранится"
+                         :format '())))))
+
   (testing "stemming-word fn"
     (is
      (= "пшениц"

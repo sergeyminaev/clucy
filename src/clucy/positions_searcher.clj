@@ -40,6 +40,23 @@ from the end of the previous word to the beginning of the next word."
             (.close ts)
             result))))))
 
+(defn stemming-text [^String text
+                     & {:keys [format] :or {format #{}}}]
+  "Convert words from dictionary set into stemmed form according to *analyzer*."
+  (let [^TokenStream ts (.tokenStream *analyzer* (as-str *field-name*) text)
+        ^CharTermAttribute ta (.addAttribute ts CharTermAttribute)
+        next-token (fn []
+                     (if (.incrementToken ts)
+                       (.toString ta)))]
+    (.reset ts)
+    (loop [result format]
+      (let [next (next-token)]
+        (if next
+          (recur (conj result next))
+          (do
+            (.close ts)
+            result))))))
+
 (defn stemming-word [^String word]
   "Get stemmed form of word according to *analyzer*."
   (let [^TokenStream ts (.tokenStream *analyzer* (as-str *field-name*) word)
