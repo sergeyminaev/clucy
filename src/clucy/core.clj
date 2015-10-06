@@ -59,8 +59,7 @@
   (with-meta
     (if (instance? clojure.lang.IObj item)
       item
-      #(identity item)) (into {}
-                             (map #(vector % true) params))))
+      #(identity item)) params))
 
 (defn add-field
   "Add a Field to a Document.
@@ -85,9 +84,9 @@
                      [true false] Field$Index/NOT_ANALYZED
                      [false true] Field$Index/ANALYZED_NO_NORMS
                      [true true] Field$Index/NOT_ANALYZED_NO_NORMS))
-                 (if (false? (:with-positions-offsets meta-map))
-                   Field$TermVector/NO
-                   Field$TermVector/WITH_POSITIONS_OFFSETS)))))
+                 (if (:positions-offsets meta-map)
+                   Field$TermVector/WITH_POSITIONS_OFFSETS
+                   Field$TermVector/NO)))))
 
 (defn- map-stored
   "Returns a hash-map containing all of the values in the map that
@@ -122,14 +121,18 @@
   (let [document (Document.)]
     (add-field document
                *field-name*
-               (reduce #(str %1 " " %2) "" set))
+               (reduce #(str %1 " " %2) "" set)
+               (meta set))
     document))
 
 (defn- string->document
   "Create a Document from string."
   [s]
   (let [document (Document.)]
-    (add-field document *field-name* s)
+    (add-field document
+               *field-name*
+               s
+               (meta s))
     document))
 
 (defn add

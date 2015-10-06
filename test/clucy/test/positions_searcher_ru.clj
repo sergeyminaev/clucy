@@ -70,9 +70,7 @@
                         (disk-index (.getAbsolutePath (make-temp-dir))))
                 _ (add index (set-field-params
                               test-text
-                              [:stored
-                               :analyzed
-                               :with-positions-offsets]))
+                              {:positions-offsets true}))
                 searcher (make-dict-searcher
                           #{"синица"
                             "пшеница"
