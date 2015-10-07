@@ -219,7 +219,7 @@ from text-data (istream or String as text source)."
     (cond
       ;; ---
       (string? text-data)
-      (map (fn [[beg end]] [(subs text-data beg end) beg]) positions)
+      (reverse (map (fn [[beg end]] [(subs text-data beg end) beg]) positions))
       ;; ---
       (istream? text-data)
       (let [pb-stream ^PushbackInputStream (PushbackInputStream. text-data)]
@@ -240,7 +240,7 @@ from text-data (istream or String as text source)."
                     ;; End of the previous entity (word or phrase) is after
                     ;; the current entity beginning.
                     (do
-                      (.unread rdr (char-array (-> result last first)))
+                      (.unread rdr (char-array (ffirst result)))
                       (read-chars rdr (- beg prev-beg))))
                   (let [delta (- end beg)]
                     (recur
