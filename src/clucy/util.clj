@@ -45,3 +45,6 @@
   (let [cbuf (char-array num-of-chars)]
     (.read reader cbuf 0 num-of-chars)
     cbuf))
+
+(defn istream? [arg]
+  (instance? java.io.InputStream arg))
