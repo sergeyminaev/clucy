@@ -1,6 +1,7 @@
 Clucy
 =====
 
+[![License EPL](https://img.shields.io/badge/license-EPL-yellow.svg)](https://www.eclipse.org/legal/epl-v10.html)
 [![Build Status](https://travis-ci.org/kostafey/clucy.svg?branch=master)](https://travis-ci.org/kostafey/clucy)
 
 Clucy is a Clojure interface to [Lucene](http://lucene.apache.org/).
@@ -11,10 +12,12 @@ Installation
 To install Clucy, add the following dependency to your `project.clj`
 file:
 
-    [org.clojars.kostafey/clucy "0.5.3"]
+    [org.clojars.kostafey/clucy "0.5.3-SNAPSHOT"]
 
 Usage
 -----
+
+#### Search in documents
 
 To use Clucy, first require it:
 
@@ -50,6 +53,33 @@ You can search and remove all in one step. To remove all of the
 scientists...
 
     (clucy/search-and-delete index "job:scientist")
+
+#### Search text positions in single document
+
+```clojure
+(ns example
+  (:use [clucy.core
+         clucy.analyzers
+         clucy.positions-searcher]))
+
+(binding [*analyzer* (make-analyzer :en)]
+  (let [test-text "This is the house that Jack built.
+                   This is the malt
+                   That lay in the house that Jack built."
+        index (memory-index)
+        _ (add index (set-field-params
+                      test-text
+                      {:positions-offsets true}))
+        searcher (make-dict-searcher
+                  #{"house"
+                    "lay"
+                    "Jack built"})
+        result-iter (searcher index test-text)]
+    result-iter))
+```
+
+    => ([95 "lay"] [106 "house"] [12 "house"] [23 "Jack built"] [117 "Jack built"])
+
 
 Storing Fields
 --------------

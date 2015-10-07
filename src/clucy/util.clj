@@ -35,3 +35,13 @@
 (defn string->stream [s]
   (ByteArrayInputStream.
    (.getBytes s StandardCharsets/UTF_8)))
+
+(defn chars->string [chars]
+  "Make a string from a sequence of characters."
+  (apply str chars))
+
+(defn read-chars [^java.io.Reader reader
+                  ^Integer num-of-chars]
+  (let [cbuf (char-array num-of-chars)]
+    (.read reader cbuf 0 num-of-chars)
+    cbuf))

@@ -90,4 +90,10 @@
                                  (-> "чулан"
                                      string->stream
                                      stream->wordset))]
-             (stemming-word "чулан"))))))
+             (stemming-word "чулан")))))
+
+  (testing "show-text fn"
+    (is (= [["Который" 11] ["построил" 19] ["построил Джек" 19]]
+           (show-text
+            [[11 18] [19 27] [19 32]]
+            (string->stream test-text))))))

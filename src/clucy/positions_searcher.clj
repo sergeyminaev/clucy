@@ -4,6 +4,8 @@
         clucy.util
         clucy.analyzers)
   (:import
+   (java.io PushbackInputStream
+            PushbackReader)
    (org.apache.lucene.util BytesRef)
    (org.apache.lucene.index IndexWriter
                             DirectoryReader
@@ -209,3 +211,36 @@ Function returns iterator through matches with the following structure:
                                          (lazy-seq (it))))))]
                        (lazy-flatten (it)))))]
     searcher))
+
+(defn show-text [positions istream]
+  "Convert positions [[beg eng]...] sequence to [\"matched text\" beg]
+from istream as text source."
+  (let [pb-stream ^PushbackInputStream (PushbackInputStream. istream)
+        positions (sort-by first positions)]
+    (with-open [rdr (PushbackReader. (clojure.java.io/reader pb-stream)
+                                     256)]
+      (loop [pos-runner positions
+             prev-beg 0
+             prev-end 0
+             result []]
+        (let [pos (first pos-runner)
+              beg (first pos)
+              end (second pos)]
+          (if pos
+            (do
+              (assert (< beg end))
+              (if (< prev-end beg)
+                (read-chars rdr (- beg prev-end))
+                ;; End of the previous entity (word or phrase) is after
+                ;; the current entity beginning.
+                (do
+                  (.unread rdr (char-array (-> result last first)))
+                  (read-chars rdr (- beg prev-beg))))
+              (let [delta (- end beg)]
+                (recur
+                 (next pos-runner)
+                 beg
+                 end
+                 (conj result
+                       [(chars->string (read-chars rdr delta)) beg]))))
+            result))))))
