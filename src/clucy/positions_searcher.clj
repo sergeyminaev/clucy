@@ -77,7 +77,7 @@ from the end of the previous word to the beginning of the next word."
                          phrase-words)))
                  (map #(.split % " ") dict-phrases-set))))
 
-(defn- get-data-from-terms-enum [^TermsEnum te ^String text]
+(defn- get-data-from-terms-enum [^TermsEnum te]
   (let [^PostingsEnum pe (.postings te nil)]
     (.nextDoc pe)
     (loop [text-occurencies []]
@@ -85,11 +85,7 @@ from the end of the previous word to the beginning of the next word."
                true
                (catch Exception e
                  false))
-        (recur (cons [(.startOffset pe)
-                      ;; word in text as-is
-                      (subs text
-                            (.startOffset pe)
-                            (.endOffset pe))]
+        (recur (cons [(.startOffset pe) (.endOffset pe)]
                      text-occurencies))
         text-occurencies))))
 
@@ -144,8 +140,7 @@ from the end of the previous word to the beginning of the next word."
            result))))))
 
 (defn- find-phrase [^clojure.lang.PersistentVector phrase
-                    ^TermsEnum te
-                    ^String text]
+                    ^TermsEnum te]
   "Phrase position searching."
   (let [first-positions (if (.seekExact te (BytesRef. (first phrase)))
                           (get-positions te))]
@@ -163,28 +158,25 @@ from the end of the previous word to the beginning of the next word."
                   (recur (next words) filtered)))
               nil)
             (map (fn [phrase-words-positions]
-                   (let [phrase-text (subs text
-                                           ;; The beginning of the first
-                                           ;; word in the phrase
-                                           (ffirst phrase-words-positions)
-                                           ;; The end of the last
-                                           ;; word in the phrase
-                                           (llast phrase-words-positions))]
-                     [(ffirst phrase-words-positions) phrase-text]))
+                   [;; The beginning of the first
+                    ;; word in the phrase
+                    (ffirst phrase-words-positions)
+                    ;; The end of the last
+                    ;; word in the phrase
+                    (llast phrase-words-positions)])
                  (filter #(not (empty? %)) result))))))))
 
 (defn make-dict-searcher [dict]
   "Construct search function on index for passed dictionary.
 Function returns iterator through matches with the following structure:
-[start-offset matched-text]."
+[start-offset end-offset]."
   (let [docID 0
         phrases (into #{} (filter #(.contains % " ") dict))
         words (clojure.set/difference dict phrases)
         search-terms (stack (map #(BytesRef. %)
                                  (stemming-dict words)))
         search-phrases-set (stack (stemming-phrases phrases))
-        searcher (fn [^org.apache.lucene.store.Directory index
-                      ^String text]
+        searcher (fn [^org.apache.lucene.store.Directory index]
                    (let [^DirectoryReader ireader (DirectoryReader/open index)
                          ^Terms terms (.getTermVector ireader
                                                       docID
@@ -194,15 +186,12 @@ Function returns iterator through matches with the following structure:
                                        (let [term-from-dict (pop search-terms)]
                                          (if term-from-dict
                                            (if (.seekExact te term-from-dict)
-                                             (get-data-from-terms-enum
-                                              te text)
+                                             (get-data-from-terms-enum te)
                                              (recur))
                                            (let [phrase
                                                  (pop search-phrases-set)]
                                              (if phrase
-                                               (or (find-phrase phrase
-                                                                te
-                                                                text)
+                                               (or (find-phrase phrase te)
                                                    (recur)))))))]
                      (letfn [(it []
                                (let [term (next-result)]
@@ -212,7 +201,7 @@ Function returns iterator through matches with the following structure:
                        (lazy-flatten (it)))))]
     searcher))
 
-(defn show-text [positions text-data]
+(defn show-text-matches [positions text-data]
   "Convert positions [[beg eng]...] sequence to [\"matched text\" beg]
 from text-data (istream or String as text source)."
   (let [positions (sort-by first positions)]

@@ -66,19 +66,20 @@ scientists...
   (let [test-text "This is the house that Jack built.
                    This is the malt
                    That lay in the house that Jack built."
-        index (memory-index)
-        _ (add index (set-field-params
+        index (doto (memory-index)
+                (add (set-field-params
                       test-text
-                      {:positions-offsets true}))
+                      {:positions-offsets true})))
         searcher (make-dict-searcher
                   #{"house"
                     "lay"
                     "Jack built"})
-        result-iter (searcher index test-text)]
-    result-iter))
+        result-iter (searcher index)]
+    (sort-by second
+             (show-text-matches result-iter test-text))))
 ```
 
-    => ([95 "lay"] [106 "house"] [12 "house"] [23 "Jack built"] [117 "Jack built"])
+    => (["house" 12] ["Jack built" 23] ["lay" 95] ["house" 106] ["Jack built" 117])
 
 
 Storing Fields

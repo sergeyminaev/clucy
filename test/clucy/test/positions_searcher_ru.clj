@@ -56,28 +56,30 @@
 
   (testing "make-dict-searcher fn"
     (is
-     (= '([176 "пшеницу"]
-          [43 "пшеница"]
-          [145 "синица"]
-          [19 "построил Джек"]
-          [107 "построил Джек"]
-          [240 "построил Джек"]
-          [169 "ворует пшеницу"])
+     (= '(["построил Джек" 19]
+          ["пшеница" 43]
+          ["построил Джек" 107]
+          ["синица" 145]
+          ["ворует пшеницу" 169]
+          ["пшеницу" 176]
+          ["построил Джек" 240])
         (binding [*analyzer* (make-analyzer :ru)]
-          (let [index (if (< (.length test-text)
-                             *ram-allocation-threshold*)
-                        (memory-index)
-                        (disk-index (.getAbsolutePath (make-temp-dir))))
-                _ (add index (set-field-params
+          (let [index (doto
+                          (if (< (.length test-text)
+                                 *ram-allocation-threshold*)
+                            (memory-index)
+                            (disk-index (.getAbsolutePath (make-temp-dir))))
+                        (add (set-field-params
                               test-text
-                              {:positions-offsets true}))
+                              {:positions-offsets true})))
                 searcher (make-dict-searcher
                           #{"синица"
                             "пшеница"
                             "воры пшеницы"
                             "построит Джек"})
-                result-iter (searcher index test-text)]
-            result-iter)))))
+                result-iter (searcher index)]
+            (sort-by second
+                     (show-text-matches result-iter test-text)))))))
 
   (testing "stemming exclusion"
     (is (= "чула"
@@ -92,12 +94,12 @@
                                      stream->wordset))]
              (stemming-word "чулан")))))
 
-  (testing "show-text fn"
+  (testing "show-text-matches fn"
     (is (= '(["построил Джек" 19] ["построил" 19] ["Который" 11])
-           (show-text
+           (show-text-matches
             [[11 18] [19 27] [19 32]]
             (string->stream test-text))))
     (is (= '(["построил Джек" 19] ["построил" 19] ["Который" 11])
-           (show-text
+           (show-text-matches
             [[11 18] [19 27] [19 32]]
             test-text)))))
