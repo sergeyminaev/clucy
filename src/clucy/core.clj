@@ -4,9 +4,11 @@
            (java.net URI)
            (org.apache.lucene.analysis Analyzer TokenStream)
            (org.apache.lucene.analysis.standard StandardAnalyzer)
-           (org.apache.lucene.document Document Field Field$Index Field$Store Field$TermVector)
+           (org.apache.lucene.document Document Field FieldType
+                                       Field$Index Field$Store Field$TermVector)
            (org.apache.lucene.index IndexWriter IndexReader Term
-                                    IndexWriterConfig DirectoryReader FieldInfo)
+                                    IndexWriterConfig DirectoryReader FieldInfo
+                                    IndexOptions)
            (org.apache.lucene.queryparser.classic QueryParser)
            (org.apache.lucene.search BooleanClause BooleanClause$Occur
                                      BooleanQuery IndexSearcher Query ScoreDoc
@@ -14,7 +16,8 @@
            (org.apache.lucene.search.highlight Highlighter QueryScorer
                                                SimpleHTMLFormatter)
            (org.apache.lucene.util Version AttributeSource)
-           (org.apache.lucene.store NIOFSDirectory RAMDirectory Directory)))
+           (org.apache.lucene.store NIOFSDirectory RAMDirectory Directory))
+  (:use [clucy.util :only (reader?)]))
 
 (def ^{:dynamic true} *version* Version/LUCENE_CURRENT)
 (def ^{:dynamic true} *analyzer* (StandardAnalyzer.))
@@ -23,7 +26,6 @@
 (defn as-str ^String [x]
   (cond
     (keyword? x) (name x)
-    (and (fn? x) (string? (x))) (x)
     :default (str x)))
 
 ;; flag to indicate a default "_content" field should be maintained
@@ -61,32 +63,37 @@
       item
       #(identity item)) params))
 
+(defn make-field-type [meta-map]
+  (doto (FieldType.)
+    (.setIndexOptions (if (get meta-map :indexed true)
+                        IndexOptions/DOCS
+                        IndexOptions/NONE))
+    (.setStored    (boolean (get meta-map :stored true)))
+    (.setOmitNorms (not (boolean (get meta-map :norms true))))
+    (.setStoreTermVectors       (boolean
+                                 (get meta-map :positions-offsets false)))
+    (.setStoreTermVectorOffsets (boolean
+                                 (get meta-map :positions-offsets false)))))
+
+
 (defn add-field
   "Add a Field to a Document.
   Following options are allowed for meta-map:
-  :stored - when false, then do not store the field value in the index.
+  :stored  - when false, then do not store the field value in the index.
   :indexed - when false, then do not index the field.
-  :analyzed - when :indexed is enabled use this option to disable/eneble Analyzer for current field.
-  :norms - when :indexed is enabled user this option to disable/enable the storing of norms."
+  :norms   - when :indexed is enabled user this option to disable/enable
+             the storing of norms.
+  :positions-offsets - when true store token positions into the term vector
+                       for this field and field's indexed form should be also
+                       stored into term vectors."
   ([document key value]
    (add-field document key value {}))
 
   ([document key value meta-map]
    (.add ^Document document
-         (Field. (as-str key) (as-str value)
-                 (if (false? (:stored meta-map))
-                   Field$Store/NO
-                   Field$Store/YES)
-                 (if (false? (:indexed meta-map))
-                   Field$Index/NO
-                   (case [(false? (:analyzed meta-map)) (false? (:norms meta-map))]
-                     [false false] Field$Index/ANALYZED
-                     [true false] Field$Index/NOT_ANALYZED
-                     [false true] Field$Index/ANALYZED_NO_NORMS
-                     [true true] Field$Index/NOT_ANALYZED_NO_NORMS))
-                 (if (:positions-offsets meta-map)
-                   Field$TermVector/WITH_POSITIONS_OFFSETS
-                   Field$TermVector/NO)))))
+         (Field. (as-str key)
+                 value
+                 (make-field-type meta-map)))))
 
 (defn- map-stored
   "Returns a hash-map containing all of the values in the map that
@@ -110,7 +117,7 @@
   [map]
   (let [document (Document.)]
     (doseq [[key value] map]
-      (add-field document key value (key (meta map))))
+      (add-field document key (as-str value) (key (meta map))))
     (if *content*
       (add-field document :_content (concat-values map)))
     document))
@@ -126,12 +133,12 @@
     document))
 
 (defn- string->document
-  "Create a Document from string."
+  "Create a Document from String or java.io.Reader."
   [s]
   (let [document (Document.)]
     (add-field document
                *field-name*
-               s
+               (s)
                (meta s))
     document))
 
@@ -146,6 +153,9 @@
         (set? i) (.addDocument writer
                                (set->document i))
         (and (fn? i) (string? (i))) (.addDocument
+                                     writer
+                                     (string->document i))
+        (and (fn? i) (reader? (i))) (.addDocument
                                      writer
                                      (string->document i))))))
 

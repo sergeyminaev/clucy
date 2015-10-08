@@ -48,3 +48,6 @@
 
 (defn istream? [arg]
   (instance? java.io.InputStream arg))
+
+(defn reader? [arg]
+  (instance? java.io.Reader arg))

@@ -54,7 +54,49 @@
                               "построил Джек"
                               "доить корову"})))))
 
+  (testing "stemming exclusion"
+    (is (= "чула"
+           (binding [*analyzer* (make-analyzer :ru)]
+             (stemming-word "чулан"))))
+    (is (= "чулан"
+           (binding [*analyzer* (make-analyzer
+                                 :ru
+                                 (file->wordset "russian_stop.txt")
+                                 (-> "чулан"
+                                     string->stream
+                                     stream->wordset))]
+             (stemming-word "чулан")))))
+
+  (testing "show-text-matches fn"
+    (is (= '(["построил Джек" 19] ["построил" 19] ["Который" 11])
+           (show-text-matches
+            [[11 18] [19 27] [19 32]]
+            (string->stream test-text))))
+    (is (= '(["построил Джек" 19] ["построил" 19] ["Который" 11])
+           (show-text-matches
+            [[11 18] [19 27] [19 32]]
+            test-text))))
+
   (testing "make-dict-searcher fn"
+    (is
+     (= '([176 183] [43 50] [145 151] [19 32] [107 120] [240 253] [169 183])
+        (with-open [rdr (clojure.java.io/reader
+                         (string->stream test-text))]
+          (binding [*analyzer* (make-analyzer :ru)]
+            (let [index (doto (memory-index)
+                          (add (set-field-params
+                                rdr
+                                {:stored false
+                                 :positions-offsets true})))
+                  searcher (make-dict-searcher
+                            #{"синица"
+                              "пшеница"
+                              "воры пшеницы"
+                              "построит Джек"})
+                  result-iter (searcher index)]
+              result-iter))))))
+
+  (testing "usage example"
     (is
      (= '(["построил Джек" 19]
           ["пшеница" 43]
@@ -79,27 +121,4 @@
                             "построит Джек"})
                 result-iter (searcher index)]
             (sort-by second
-                     (show-text-matches result-iter test-text)))))))
-
-  (testing "stemming exclusion"
-    (is (= "чула"
-           (binding [*analyzer* (make-analyzer :ru)]
-             (stemming-word "чулан"))))
-    (is (= "чулан"
-           (binding [*analyzer* (make-analyzer
-                                 :ru
-                                 (file->wordset "russian_stop.txt")
-                                 (-> "чулан"
-                                     string->stream
-                                     stream->wordset))]
-             (stemming-word "чулан")))))
-
-  (testing "show-text-matches fn"
-    (is (= '(["построил Джек" 19] ["построил" 19] ["Который" 11])
-           (show-text-matches
-            [[11 18] [19 27] [19 32]]
-            (string->stream test-text))))
-    (is (= '(["построил Джек" 19] ["построил" 19] ["Который" 11])
-           (show-text-matches
-            [[11 18] [19 27] [19 32]]
-            test-text)))))
+                     (show-text-matches result-iter test-text))))))))
