@@ -1,11 +1,8 @@
 (ns clucy.util
-  (:refer-clojure :exclude [pop])
   (:import
    (java.io File
             ByteArrayInputStream)
-   (java.nio.charset StandardCharsets)
-   (java.util ArrayList
-              Stack)))
+   (java.nio.charset StandardCharsets)))
 
 (defn ^File make-temp-dir
   ([^String prefix]
@@ -15,15 +12,6 @@
        (.mkdir temp-file)
        temp-file)))
   ([] (make-temp-dir "lucene")))
-
-(defn stack ^Stack [items]
-  (let [s (Stack.)]
-    (dorun (map #(.push s %) items))
-    s))
-
-(defn pop [^Stack s]
-  (if (not (.empty s))
-    (.pop s)))
 
 (defn llast [x]
   (-> x last last))
@@ -51,3 +39,6 @@
 
 (defn reader? [arg]
   (instance? java.io.Reader arg))
+
+(defn file? [arg]
+  (instance? java.io.File arg))

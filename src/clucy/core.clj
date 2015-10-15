@@ -17,7 +17,7 @@
                                                SimpleHTMLFormatter)
            (org.apache.lucene.util Version AttributeSource)
            (org.apache.lucene.store NIOFSDirectory RAMDirectory Directory))
-  (:use [clucy.util :only (reader?)]))
+  (:use [clucy.util :only (reader? file?)]))
 
 (def ^{:dynamic true} *version* Version/LUCENE_CURRENT)
 (def ^{:dynamic true} *analyzer* (StandardAnalyzer.))
@@ -142,6 +142,17 @@
                (meta s))
     document))
 
+(defn- file->document
+  "Create a Document from java.io.File."
+  [s]
+  (let [document (Document.)]
+    (with-open [rdr (clojure.java.io/reader s)]
+      (add-field document
+                 *field-name*
+                 rdr
+                 (meta s)))
+    document))
+
 (defn add
   "Add hash-maps to the search index."
   [index & items]
@@ -157,7 +168,10 @@
                                      (string->document i))
         (and (fn? i) (reader? (i))) (.addDocument
                                      writer
-                                     (string->document i))))))
+                                     (string->document i))
+        (and (fn? i) (file? (i))) (.addDocument
+                                     writer
+                                     (file->document i))))))
 
 (defn delete
   "Deletes hash-maps from the search index."

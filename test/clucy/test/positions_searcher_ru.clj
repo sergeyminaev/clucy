@@ -1,5 +1,4 @@
 (ns clucy.test.positions-searcher-ru
-  (:refer-clojure :exclude [pop])
   (:use clucy.core
         clojure.test
         clucy.util
@@ -79,7 +78,7 @@
 
   (testing "make-dict-searcher fn"
     (is
-     (= '([176 183] [43 50] [145 151] [19 32] [107 120] [240 253] [169 183])
+     (= '([145 151] [176 183] [43 50] [169 183] [19 32] [107 120] [240 253])
         (with-open [rdr (clojure.java.io/reader
                          (string->stream test-text))]
           (binding [*analyzer* (make-analyzer :ru)]

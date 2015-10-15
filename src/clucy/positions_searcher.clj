@@ -1,5 +1,4 @@
 (ns clucy.positions-searcher
-  (:refer-clojure :exclude [pop])
   (:use clucy.core
         clucy.util
         clucy.analyzers)
@@ -142,10 +141,10 @@ from the end of the previous word to the beginning of the next word."
 (defn- find-phrase [^clojure.lang.PersistentVector phrase
                     ^TermsEnum te]
   "Phrase position searching."
-  (let [first-positions (if (.seekExact te (BytesRef. (first phrase)))
+  (let [first-positions (if (.seekExact te (first phrase))
                           (get-positions te))]
     (if first-positions
-      (loop [words (map #(BytesRef. %) (next phrase))
+      (loop [words (next phrase)
              result (map vector first-positions)]
         (let [word (first words)]
           (if word
@@ -173,32 +172,26 @@ Function returns iterator through matches with the following structure:
   (let [docID 0
         phrases (into #{} (filter #(.contains % " ") dict))
         words (clojure.set/difference dict phrases)
-        search-terms (stack (map #(BytesRef. %)
-                                 (stemming-dict words)))
-        search-phrases-set (stack (stemming-phrases phrases))
+        search-words (map #(BytesRef. %) (stemming-dict words))
+        search-phrases (map (fn [phrase] (map #(BytesRef. %) phrase))
+                            (stemming-phrases phrases))
         searcher (fn [^org.apache.lucene.store.Directory index]
                    (let [^DirectoryReader ireader (DirectoryReader/open index)
                          ^Terms terms (.getTermVector ireader
                                                       docID
                                                       (as-str *field-name*))
                          ^TermsEnum te (.iterator terms)
-                         next-result (fn []
-                                       (let [term-from-dict (pop search-terms)]
-                                         (if term-from-dict
-                                           (if (.seekExact te term-from-dict)
-                                             (get-data-from-terms-enum te)
-                                             (recur))
-                                           (let [phrase
-                                                 (pop search-phrases-set)]
-                                             (if phrase
-                                               (or (find-phrase phrase te)
-                                                   (recur)))))))]
-                     (letfn [(it []
-                               (let [term (next-result)]
-                                 (when term
-                                   (cons term
-                                         (lazy-seq (it))))))]
-                       (lazy-flatten (it)))))]
+                         result (filter
+                                 #(not (nil? %))
+                                 (concat
+                                  (map (fn [word]
+                                         (if (.seekExact te word)
+                                           (get-data-from-terms-enum te)))
+                                       search-words)
+                                  (map (fn [phrase]
+                                         (find-phrase phrase te))
+                                       search-phrases)))]
+                     (lazy-flatten result)))]
     searcher))
 
 (defn show-text-matches [positions text-data]
