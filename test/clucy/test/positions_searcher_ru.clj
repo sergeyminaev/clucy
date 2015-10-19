@@ -93,7 +93,20 @@
                               "воры пшеницы"
                               "построит Джек"})
                   result-iter (searcher index)]
-              result-iter))))))
+              result-iter)))))
+    (is (= '([0 6])
+           (with-open [rdr (clojure.java.io/reader
+                            (string->stream "синица"))]
+             (binding [*analyzer* (make-analyzer :ru)]
+               (let [index (doto (memory-index)
+                             (add (set-field-params
+                                   rdr
+                                   {:stored false
+                                    :positions-offsets true})))
+                     searcher (make-dict-searcher
+                               #{"синица"})
+                     result-iter (searcher index)]
+                 result-iter))))))
 
   (testing "usage example"
     (is

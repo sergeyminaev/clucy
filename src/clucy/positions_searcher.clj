@@ -86,7 +86,8 @@ from the end of the previous word to the beginning of the next word."
                  false))
         (recur (cons [(.startOffset pe) (.endOffset pe)]
                      text-occurencies))
-        text-occurencies))))
+        [(.utf8ToString (.term te))
+         text-occurencies]))))
 
 (defn- get-positions [^TermsEnum te]
   (let [^PostingsEnum pe (.postings te nil)]
@@ -172,25 +173,44 @@ Function returns iterator through matches with the following structure:
   (let [docID 0
         phrases (into #{} (filter #(.contains % " ") dict))
         words (clojure.set/difference dict phrases)
-        search-words (map #(BytesRef. %) (stemming-dict words))
-        search-phrases (map (fn [phrase] (map #(BytesRef. %) phrase))
-                            (stemming-phrases phrases))
+        search-words (stemming-dict words)
+        search-phrases (stemming-phrases phrases)
+        dict-lenght (count words)
         searcher (fn [^org.apache.lucene.store.Directory index]
                    (let [^DirectoryReader ireader (DirectoryReader/open index)
                          ^Terms terms (.getTermVector ireader
                                                       docID
                                                       (as-str *field-name*))
+                         terms-lenght (.size terms)
                          ^TermsEnum te (.iterator terms)
+                         term-iter (letfn
+                                       [(next-term []
+                                          (if (.next te)
+                                            (get-data-from-terms-enum te)))
+                                        (it [] (let [term (next-term)]
+                                                 (when term
+                                                   (cons term
+                                                         (lazy-seq (it))))))]
+                                     it)
                          result (filter
                                  #(not (nil? %))
                                  (concat
-                                  (map (fn [word]
-                                         (if (.seekExact te word)
-                                           (get-data-from-terms-enum te)))
-                                       search-words)
+                                  (if (< terms-lenght (* dict-lenght 2))
+                                    (map (fn [[wd ; Stemmed word
+                                               ps ; Positions [[beg end]... ]
+                                               ]]
+                                           (if (search-words wd) ps))
+                                         (term-iter))
+                                    (map (fn [word]
+                                           (if (.seekExact te word)
+                                             (second
+                                              (get-data-from-terms-enum te))))
+                                         (map #(BytesRef. %) search-words)))
                                   (map (fn [phrase]
                                          (find-phrase phrase te))
-                                       search-phrases)))]
+                                       (map (fn [phrase]
+                                              (map #(BytesRef. %) phrase))
+                                            search-phrases))))]
                      (lazy-flatten result)))]
     searcher))
 
