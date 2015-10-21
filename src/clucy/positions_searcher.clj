@@ -150,13 +150,13 @@ from the end of the previous word to the beginning of the next word."
                     (llast phrase-words-positions)])
                  (filter #(not (empty? %)) result))))))))
 
-(defn make-dict-searcher [dict & {:keys [return-stemmed]
-                                  :or {return-stemmed false}}]
+(defn make-dict-searcher [dict & {:keys [with-stemmed]
+                                  :or {with-stemmed false}}]
   "Construct search function on index for passed dictionary.
   Function returns iterator through matches with the following structure:
   [start-offset end-offset].
 
-  When return-stemmed is true, the iteratior item is the following:
+  When :with-stemmed is true, the iteratior item is the following:
   [stemmed-word [start-offset end-offset]]"
   (let [docID 0
         phrases (into #{} (filter #(.contains % " ") dict))
@@ -191,7 +191,7 @@ from the end of the previous word to the beginning of the next word."
                                                ps ; Positions [[beg end]... ]
                                                ]]
                                            (if (iwords wd)
-                                             (if return-stemmed
+                                             (if with-stemmed
                                                (let [word (.utf8ToString wd)]
                                                  (map (fn [pos]
                                                         [word pos])
@@ -200,14 +200,14 @@ from the end of the previous word to the beginning of the next word."
                                          (term-iter))
                                     (map (fn [br-word word]
                                            (if (.seekExact te br-word)
-                                             (if return-stemmed
+                                             (if with-stemmed
                                                (map (fn [pos]
                                                       [word pos])
                                                     (get-positions te))
                                                (get-positions te))))
                                          br-words search-words))
                                   (map (fn [br-phrase phrase]
-                                         (if return-stemmed
+                                         (if with-stemmed
                                            (let [phrase-str
                                                  (clojure.string/join " " phrase)]
                                              (map (fn [pos]
@@ -218,14 +218,25 @@ from the end of the previous word to the beginning of the next word."
                      (lazy-flatten result)))]
     searcher))
 
-(defn show-text-matches [positions text-data]
-  "Convert positions [[beg eng]...] sequence to [\"matched text\" beg]
-from text-data (istream or String as text source)."
+(defn show-text-matches [positions text-data & {:keys [with-stemmed]
+                                                :or {with-stemmed false}}]
+  "Convert positions [[beg eng]...] sequence to [[matched-text beg]... ]
+  from text-data (istream or String as text source).
+
+  When :with-stemmed is true return [[matched-text stemmed-text beg]... ],
+  assume first argument has [[stemmed-word [start-offset end-offset]]... ]
+  structure."
   (let [positions (sort-by first positions)]
     (cond
       ;; ---
       (string? text-data)
-      (reverse (map (fn [[beg end]] [(subs text-data beg end) beg]) positions))
+      (if with-stemmed
+        (reverse (map (fn [[stemmed [beg end]]]
+                        [(subs text-data beg end) stemmed beg])
+                      positions))
+        (reverse (map (fn [[beg end]]
+                        [(subs text-data beg end) beg])
+                      positions)))
       ;; ---
       (istream? text-data)
       (let [pb-stream ^PushbackInputStream (PushbackInputStream. text-data)]
@@ -235,10 +246,12 @@ from text-data (istream or String as text source)."
                  prev-beg 0
                  prev-end 0
                  result '()]
-            (let [pos (first pos-runner)
+            (let [item (first pos-runner)
+                  pos (if with-stemmed (second item) item)
+                  stemmed (first item)
                   beg (first pos)
                   end (second pos)]
-              (if pos
+              (if item
                 (do
                   (assert (< beg end))
                   (if (< prev-end beg)
@@ -248,11 +261,14 @@ from text-data (istream or String as text source)."
                     (do
                       (.unread rdr (char-array (ffirst result)))
                       (read-chars rdr (- beg prev-beg))))
-                  (let [delta (- end beg)]
+                  (let [delta (- end beg)
+                        matched-text (chars->string (read-chars rdr delta))]
                     (recur
                      (next pos-runner)
                      beg
                      end
                      (conj result
-                           [(chars->string (read-chars rdr delta)) beg]))))
+                           (if with-stemmed
+                             [matched-text stemmed beg]
+                             [matched-text beg])))))
                 result))))))))

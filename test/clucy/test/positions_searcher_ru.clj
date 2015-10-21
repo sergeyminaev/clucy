@@ -115,7 +115,7 @@
                               "пшеница"
                               "воры пшеницы"
                               "построит Джек"}
-                            :return-stemmed true)
+                            :with-stemmed true)
                   result-iter (searcher index)]
               result-iter)))))
     (is (= '([0 6])
@@ -142,7 +142,7 @@
                                     :positions-offsets true})))
                      searcher (make-dict-searcher
                                #{"синица"}
-                               :return-stemmed true)
+                               :with-stemmed true)
                      result-iter (searcher index)]
                  result-iter))))))
 
@@ -171,4 +171,29 @@
                             "построит Джек"})
                 result-iter (searcher index)]
             (sort-by second
-                     (show-text-matches result-iter test-text))))))))
+                     (show-text-matches result-iter test-text))))))
+    (is (=
+         '(["построил Джек" "постро джек" 19]
+           ["пшеница" "пшениц" 43]
+           ["построил Джек" "постро джек" 107]
+           ["синица" "синиц" 145]
+           ["ворует пшеницу" "вор пшениц" 169]
+           ["пшеницу" "пшениц" 176]
+           ["построил Джек" "постро джек" 240])
+         (binding [*analyzer* (make-analyzer :ru)]
+           (let [index (doto (memory-index)
+                         (add (set-field-params
+                               test-text
+                               {:positions-offsets true})))
+                 searcher (make-dict-searcher
+                           #{"синица"
+                             "пшеница"
+                             "воры пшеницы"
+                             "построит Джек"}
+                           :with-stemmed true)
+                 result-iter (searcher index)]
+             (sort-by #(nth % 2)
+                      (show-text-matches
+                       result-iter
+                       test-text
+                       :with-stemmed true))))))))
