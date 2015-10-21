@@ -24,23 +24,6 @@
 from the end of the previous word to the beginning of the next word."
   10)
 
-(defn stemming-dict [^clojure.lang.PersistentHashSet dict-words-set]
-  "Convert words from dictionary set into stemmed form according to *analyzer*."
-  (let [^String text (reduce #(str %1 " " %2) "" dict-words-set)
-        ^TokenStream ts (.tokenStream *analyzer* (as-str *field-name*) text)
-        ^CharTermAttribute ta (.addAttribute ts CharTermAttribute)
-        next-token (fn []
-                     (if (.incrementToken ts)
-                       (.toString ta)))]
-    (.reset ts)
-    (loop [result #{}]
-      (let [next (next-token)]
-        (if next
-          (recur (conj result next))
-          (do
-            (.close ts)
-            result))))))
-
 (defn stemming-text [^String text
                      & {:keys [format] :or {format #{}}}]
   "Convert words from text into stemmed form according to *analyzer*."
@@ -57,6 +40,11 @@ from the end of the previous word to the beginning of the next word."
           (do
             (.close ts)
             result))))))
+
+(defn stemming-dict [^clojure.lang.PersistentHashSet dict-words-set]
+  "Convert words from dictionary set into stemmed form according to *analyzer*."
+  (let [^String text (clojure.string/join " " dict-words-set)]
+    (stemming-text text)))
 
 (defn stemming-word [^String word]
   "Get stemmed form of word according to *analyzer*."
@@ -76,31 +64,27 @@ from the end of the previous word to the beginning of the next word."
                          phrase-words)))
                  (map #(.split % " ") dict-phrases-set))))
 
-(defn- get-data-from-terms-enum [^TermsEnum te]
-  (let [^PostingsEnum pe (.postings te nil)]
-    (.nextDoc pe)
-    (loop [text-occurencies []]
-      (if (try (.nextPosition pe)
-               true
-               (catch Exception e
-                 false))
-        (recur (cons [(.startOffset pe) (.endOffset pe)]
-                     text-occurencies))
-        [(.utf8ToString (.term te))
-         text-occurencies]))))
+(defn- get-positions [^TermsEnum te & {:keys [get-term]
+                                       :or {get-term false}}]
+  "When get-term is true return term itself with its positions
+  [term-as-BytesRef [[beg end]... ]]
 
-(defn- get-positions [^TermsEnum te]
-  (let [^PostingsEnum pe (.postings te nil)]
-    (.nextDoc pe)
-    (loop [positions []]
-      (if (try (.nextPosition pe)
-               true
-               (catch Exception e
-                 false))
-        (recur (cons [(.startOffset pe)
-                      (.endOffset pe)]
-                     positions))
-        positions))))
+  Return term positions otherwise
+  [[beg end]... ]"
+  (let [positions (let [^PostingsEnum pe (.postings te nil)]
+                    (.nextDoc pe)
+                    (loop [positions []]
+                      (if (try (.nextPosition pe)
+                               true
+                               (catch Exception e
+                                 false))
+                        (recur (cons [(.startOffset pe)
+                                      (.endOffset pe)]
+                                     positions))
+                        positions)))]
+    (if get-term
+      [(.term te) positions]
+      positions)))
 
 (defn- filter-near-to [;; Already founded words position -
                        ;; first words in the phrase
@@ -166,15 +150,22 @@ from the end of the previous word to the beginning of the next word."
                     (llast phrase-words-positions)])
                  (filter #(not (empty? %)) result))))))))
 
-(defn make-dict-searcher [dict]
+(defn make-dict-searcher [dict & {:keys [return-stemmed]
+                                  :or {return-stemmed false}}]
   "Construct search function on index for passed dictionary.
-Function returns iterator through matches with the following structure:
-[start-offset end-offset]."
+  Function returns iterator through matches with the following structure:
+  [start-offset end-offset].
+
+  When return-stemmed is true, the iteratior item is the following:
+  [stemmed-word [start-offset end-offset]]"
   (let [docID 0
         phrases (into #{} (filter #(.contains % " ") dict))
         words (clojure.set/difference dict phrases)
         search-words (stemming-dict words)
         search-phrases (stemming-phrases phrases)
+        br-words (map #(BytesRef. %) search-words)
+        br-phrases (map (fn [phrase] (map #(BytesRef. %) phrase)) search-phrases)
+        iwords (into #{} br-words)
         dict-lenght (count words)
         searcher (fn [^org.apache.lucene.store.Directory index]
                    (let [^DirectoryReader ireader (DirectoryReader/open index)
@@ -186,7 +177,7 @@ Function returns iterator through matches with the following structure:
                          term-iter (letfn
                                        [(next-term []
                                           (if (.next te)
-                                            (get-data-from-terms-enum te)))
+                                            (get-positions te :get-term true)))
                                         (it [] (let [term (next-term)]
                                                  (when term
                                                    (cons term
@@ -196,21 +187,34 @@ Function returns iterator through matches with the following structure:
                                  #(not (nil? %))
                                  (concat
                                   (if (< terms-lenght (* dict-lenght 2))
-                                    (map (fn [[wd ; Stemmed word
+                                    (map (fn [[wd ; BytesRef word
                                                ps ; Positions [[beg end]... ]
                                                ]]
-                                           (if (search-words wd) ps))
+                                           (if (iwords wd)
+                                             (if return-stemmed
+                                               (let [word (.utf8ToString wd)]
+                                                 (map (fn [pos]
+                                                        [word pos])
+                                                      ps))
+                                               ps)))
                                          (term-iter))
-                                    (map (fn [word]
-                                           (if (.seekExact te word)
-                                             (second
-                                              (get-data-from-terms-enum te))))
-                                         (map #(BytesRef. %) search-words)))
-                                  (map (fn [phrase]
-                                         (find-phrase phrase te))
-                                       (map (fn [phrase]
-                                              (map #(BytesRef. %) phrase))
-                                            search-phrases))))]
+                                    (map (fn [br-word word]
+                                           (if (.seekExact te br-word)
+                                             (if return-stemmed
+                                               (map (fn [pos]
+                                                      [word pos])
+                                                    (get-positions te))
+                                               (get-positions te))))
+                                         br-words search-words))
+                                  (map (fn [br-phrase phrase]
+                                         (if return-stemmed
+                                           (let [phrase-str
+                                                 (clojure.string/join " " phrase)]
+                                             (map (fn [pos]
+                                                    [phrase-str pos])
+                                                  (find-phrase br-phrase te)))
+                                           (find-phrase br-phrase te)))
+                                       br-phrases search-phrases)))]
                      (lazy-flatten result)))]
     searcher))
 

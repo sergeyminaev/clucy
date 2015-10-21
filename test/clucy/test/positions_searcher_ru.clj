@@ -94,6 +94,30 @@
                               "построит Джек"})
                   result-iter (searcher index)]
               result-iter)))))
+    (is
+     (= '(["синиц" [145 151]]
+          ["пшениц" [176 183]]
+          ["пшениц" [43 50]]
+          ["вор пшениц" [169 183]]
+          ["постро джек" [19 32]]
+          ["постро джек" [107 120]]
+          ["постро джек" [240 253]])
+        (with-open [rdr (clojure.java.io/reader
+                         (string->stream test-text))]
+          (binding [*analyzer* (make-analyzer :ru)]
+            (let [index (doto (memory-index)
+                          (add (set-field-params
+                                rdr
+                                {:stored false
+                                 :positions-offsets true})))
+                  searcher (make-dict-searcher
+                            #{"синица"
+                              "пшеница"
+                              "воры пшеницы"
+                              "построит Джек"}
+                            :return-stemmed true)
+                  result-iter (searcher index)]
+              result-iter)))))
     (is (= '([0 6])
            (with-open [rdr (clojure.java.io/reader
                             (string->stream "синица"))]
@@ -105,6 +129,20 @@
                                     :positions-offsets true})))
                      searcher (make-dict-searcher
                                #{"синица"})
+                     result-iter (searcher index)]
+                 result-iter)))))
+    (is (= '(["синиц" [0 6]])
+           (with-open [rdr (clojure.java.io/reader
+                            (string->stream "синица"))]
+             (binding [*analyzer* (make-analyzer :ru)]
+               (let [index (doto (memory-index)
+                             (add (set-field-params
+                                   rdr
+                                   {:stored false
+                                    :positions-offsets true})))
+                     searcher (make-dict-searcher
+                               #{"синица"}
+                               :return-stemmed true)
                      result-iter (searcher index)]
                  result-iter))))))
 

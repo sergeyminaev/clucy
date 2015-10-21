@@ -128,7 +128,7 @@
   (let [document (Document.)]
     (add-field document
                *field-name*
-               (reduce #(str %1 " " %2) "" set)
+               (clojure.string/join " " set)
                (meta set))
     document))
 
