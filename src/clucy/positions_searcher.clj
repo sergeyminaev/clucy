@@ -177,6 +177,7 @@
         br-phrases (map (fn [phrase] (map #(BytesRef. %) phrase)) search-phrases)
         iwords (into #{} br-words)
         dict-lenght (count words)
+        with-stemmed *with-stemmed*
         searcher (fn [^org.apache.lucene.store.Directory index]
                    (let [^DirectoryReader ireader (DirectoryReader/open index)
                          ^Terms terms (.getTermVector ireader
@@ -201,7 +202,7 @@
                                                ps ; Positions [[beg end]... ]
                                                ]]
                                            (if (iwords wd)
-                                             (if *with-stemmed*
+                                             (if with-stemmed
                                                (let [word (.utf8ToString wd)]
                                                  (map (fn [pos]
                                                         [word pos])
@@ -210,14 +211,14 @@
                                          (term-iter))
                                     (map (fn [br-word word]
                                            (if (.seekExact te br-word)
-                                             (if *with-stemmed*
+                                             (if with-stemmed
                                                (map (fn [pos]
                                                       [word pos])
                                                     (get-positions te))
                                                (get-positions te))))
                                          br-words search-words))
                                   (map (fn [br-phrase phrase]
-                                         (if *with-stemmed*
+                                         (if with-stemmed
                                            (let [phrase-str
                                                  (clojure.string/join " " phrase)]
                                              (map (fn [pos]
