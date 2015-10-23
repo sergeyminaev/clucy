@@ -104,7 +104,8 @@
           ["постро джек" [240 253]])
         (with-open [rdr (clojure.java.io/reader
                          (string->stream test-text))]
-          (binding [*analyzer* (make-analyzer :ru)]
+          (binding [*analyzer* (make-analyzer :ru)
+                    *with-stemmed* true]
             (let [index (doto (memory-index)
                           (add (set-field-params
                                 rdr
@@ -114,8 +115,7 @@
                             #{"синица"
                               "пшеница"
                               "воры пшеницы"
-                              "построит Джек"}
-                            :with-stemmed true)
+                              "построит Джек"})
                   result-iter (searcher index)]
               result-iter)))))
     (is (= '([0 6])
@@ -134,15 +134,15 @@
     (is (= '(["синиц" [0 6]])
            (with-open [rdr (clojure.java.io/reader
                             (string->stream "синица"))]
-             (binding [*analyzer* (make-analyzer :ru)]
+             (binding [*analyzer* (make-analyzer :ru)
+                       *with-stemmed* true]
                (let [index (doto (memory-index)
                              (add (set-field-params
                                    rdr
                                    {:stored false
                                     :positions-offsets true})))
                      searcher (make-dict-searcher
-                               #{"синица"}
-                               :with-stemmed true)
+                               #{"синица"})
                      result-iter (searcher index)]
                  result-iter))))))
 
@@ -180,7 +180,8 @@
            ["ворует пшеницу" "вор пшениц" 169]
            ["пшеницу" "пшениц" 176]
            ["построил Джек" "постро джек" 240])
-         (binding [*analyzer* (make-analyzer :ru)]
+         (binding [*analyzer* (make-analyzer :ru)
+                   *with-stemmed* true]
            (let [index (doto (memory-index)
                          (add (set-field-params
                                test-text
@@ -189,11 +190,9 @@
                            #{"синица"
                              "пшеница"
                              "воры пшеницы"
-                             "построит Джек"}
-                           :with-stemmed true)
+                             "построит Джек"})
                  result-iter (searcher index)]
              (sort-by #(nth % 2)
                       (show-text-matches
                        result-iter
-                       test-text
-                       :with-stemmed true))))))))
+                       test-text))))))))
