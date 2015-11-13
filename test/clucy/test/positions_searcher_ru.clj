@@ -1,6 +1,6 @@
 (ns clucy.test.positions-searcher-ru
-  (:use clucy.core
-        clojure.test
+  (:use clojure.test
+        clucy.core
         clucy.util
         clucy.analyzers
         clucy.positions-searcher))
@@ -27,20 +27,20 @@
   (testing "stemming-dict fn"
     (is
      (= #{"синиц" "хран" "пшениц"}
-        (binding [*analyzer* (make-analyzer :ru)]
+        (binding [*analyzer* (make-analyzer :class :ru)]
           (stemming-dict #{"пшеница" "синица" "хранится"})))))
 
   (testing "stemming-text fn"
     (is
      (= '("хран" "синиц" "пшениц")
-        (binding [*analyzer* (make-analyzer :ru)]
+        (binding [*analyzer* (make-analyzer :class :ru)]
           (stemming-text "пшеница синица хранится"
                          :format '())))))
 
   (testing "stemming-word fn"
     (is
      (= "пшениц"
-        (binding [*analyzer* (make-analyzer :ru)]
+        (binding [*analyzer* (make-analyzer :class :ru)]
           (stemming-word "пшеница")))))
 
   (testing "stemming-phrases fn"
@@ -48,22 +48,22 @@
      (= '#{("до" "коров")
            ("ворова" "пшениц")
            ("постро" "джек")}
-        (binding [*analyzer* (make-analyzer :ru)]
+        (binding [*analyzer* (make-analyzer :class :ru)]
           (stemming-phrases #{"воровать пшеницу"
                               "построил Джек"
                               "доить корову"})))))
 
   (testing "stemming exclusion"
     (is (= "чула"
-           (binding [*analyzer* (make-analyzer :ru)]
+           (binding [*analyzer* (make-analyzer :class :ru)]
              (stemming-word "чулан"))))
     (is (= "чулан"
            (binding [*analyzer* (make-analyzer
-                                 :ru
-                                 (file->wordset "russian_stop.txt")
-                                 (-> "чулан"
-                                     string->stream
-                                     stream->wordset))]
+                                 :class :ru
+                                 :stop-words (file->wordset "russian_stop.txt")
+                                 :stem-exclusion-words (-> "чулан"
+                                                           string->stream
+                                                           stream->wordset))]
              (stemming-word "чулан")))))
 
   (testing "show-text-matches fn"
@@ -81,7 +81,7 @@
      (= '([145 151] [176 183] [43 50] [169 183] [19 32] [107 120] [240 253])
         (with-open [rdr (clojure.java.io/reader
                          (string->stream test-text))]
-          (binding [*analyzer* (make-analyzer :ru)]
+          (binding [*analyzer* (make-analyzer :class :ru)]
             (let [index (doto (memory-index)
                           (add (set-field-params
                                 rdr
@@ -104,7 +104,7 @@
           ["постро джек" [240 253]])
         (with-open [rdr (clojure.java.io/reader
                          (string->stream test-text))]
-          (binding [*analyzer* (make-analyzer :ru)
+          (binding [*analyzer* (make-analyzer :class :ru)
                     *with-stemmed* true]
             (let [index (doto (memory-index)
                           (add (set-field-params
@@ -121,7 +121,7 @@
     (is (= '([0 6])
            (with-open [rdr (clojure.java.io/reader
                             (string->stream "синица"))]
-             (binding [*analyzer* (make-analyzer :ru)]
+             (binding [*analyzer* (make-analyzer :class :ru)]
                (let [index (doto (memory-index)
                              (add (set-field-params
                                    rdr
@@ -134,7 +134,7 @@
     (is (= '(["синиц" [0 6]])
            (with-open [rdr (clojure.java.io/reader
                             (string->stream "синица"))]
-             (binding [*analyzer* (make-analyzer :ru)
+             (binding [*analyzer* (make-analyzer :class :ru)
                        *with-stemmed* true]
                (let [index (doto (memory-index)
                              (add (set-field-params
@@ -155,7 +155,7 @@
           ["ворует пшеницу" 169]
           ["пшеницу" 176]
           ["построил Джек" 240])
-        (binding [*analyzer* (make-analyzer :ru)]
+        (binding [*analyzer* (make-analyzer :class :ru)]
           (let [index (doto
                           (if (< (.length test-text)
                                  *ram-allocation-threshold*)
@@ -180,7 +180,7 @@
            ["ворует пшеницу" "вор пшениц" 169]
            ["пшеницу" "пшениц" 176]
            ["построил Джек" "постро джек" 240])
-         (binding [*analyzer* (make-analyzer :ru)
+         (binding [*analyzer* (make-analyzer :class :ru)
                    *with-stemmed* true]
            (let [index (doto (memory-index)
                          (add (set-field-params

@@ -2,6 +2,8 @@
   (:use clucy.core
         clucy.util
         clucy.analyzers)
+  (:require
+   clojure.set)
   (:import
    (java.io PushbackInputStream
             PushbackReader)
@@ -197,7 +199,7 @@
                          result (filter
                                  #(not (nil? %))
                                  (concat
-                                  (if (< terms-lenght (* dict-lenght 2))
+                                  (if (< terms-lenght (* dict-lenght 5))
                                     (map (fn [[wd ; BytesRef word
                                                ps ; Positions [[beg end]... ]
                                                ]]
