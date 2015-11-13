@@ -62,7 +62,7 @@ scientists...
          clucy.analyzers
          clucy.positions-searcher]))
 
-(binding [*analyzer* (make-analyzer :en)]
+(binding [*analyzer* (make-analyzer :class :en)]
   (let [test-text "This is the house that Jack built.
                    This is the malt
                    That lay in the house that Jack built."
