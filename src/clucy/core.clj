@@ -51,7 +51,7 @@
   (IndexWriter. index
                 (IndexWriterConfig. *analyzer*)))
 
-(defn- index-reader
+(defn index-reader
   "Create an IndexReader."
   ^IndexReader
   [index]

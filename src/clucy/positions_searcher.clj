@@ -9,7 +9,7 @@
             PushbackReader)
    (org.apache.lucene.util BytesRef)
    (org.apache.lucene.index IndexWriter
-                            DirectoryReader
+                            IndexReader
                             Terms
                             TermsEnum
                             PostingsEnum
@@ -181,8 +181,8 @@
         dict-lenght (count words)
         with-stemmed *with-stemmed*
         searcher (fn [^org.apache.lucene.store.Directory index]
-                   (let [^DirectoryReader ireader (DirectoryReader/open index)
-                         ^Terms terms (.getTermVector ireader
+                   (let [^IndexReader reader (index-reader index)
+                         ^Terms terms (.getTermVector reader
                                                       docID
                                                       (as-str *field-name*))
                          terms-lenght (.size terms)
