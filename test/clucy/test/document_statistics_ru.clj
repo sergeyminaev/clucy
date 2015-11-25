@@ -18,10 +18,23 @@
           ["чулан" 2]
           ["эт" 2])
         (binding [*analyzer* (make-analyzer :class :ru)]
-          (let [index (doto
-                          (memory-index)
+          (let [index (doto (memory-index)
                         (add (set-field-params
                               clucy.test.positions-searcher-ru/test-text
                               {:positions-offsets true})))
                 iterator (get-top-words-iterator index 2)]
-            (iterator)))))))
+            (iterator))))))
+
+  (testing "stemming-dict fn"
+    (is
+     (= '(["дом котор" {:pos ([224 239] [91 106] [4 18]), :count 3}]
+          ["котор постро джек" {:pos ([232 253] [99 120] [11 32]), :count 3}]
+          ["дом котор постро" {:pos ([224 248] [91 115] [4 27]), :count 3}]
+          ["котор постро" {:pos ([232 248] [99 115] [11 27]), :count 3}]
+          ["постро джек" {:pos ([240 253] [107 120] [19 32]), :count 3}])
+        (binding [*analyzer* (make-analyzer :class :ru)]
+          (let [index (doto (memory-index)
+                        (add (set-field-params
+                              clucy.test.positions-searcher-ru/test-text
+                              {:positions-offsets true})))]
+            (get-top-phrases index 3)))))))

@@ -1,6 +1,7 @@
 (ns clucy.document-statistics
   (:use clucy.core
         clucy.analyzers)
+  (:require [clucy.positions-searcher :as pos])
   (:import
    (org.apache.lucene.index IndexReader
                             Terms
@@ -30,3 +31,61 @@ Iterator item structure: [word frequency]."
                        (cons term-freq
                              (lazy-seq (it))))))]
       it)))
+
+(defn get-top-phrases [index & [top]]
+  "Return top most common phrases in index.
+Output structure: ([phrase {:pos [beg end] :count frequency}]... )"
+  (let [docID 0
+        ^IndexReader reader (index-reader index)
+        ^Terms terms (.getTermVector reader
+                                     docID
+                                     (as-str *field-name*))
+        ^TermsEnum te (.iterator terms)
+        ;; [[term-as-BytesRef [[beg end]... ]]... ]
+        terms-iter (pos/get-term-iter te)
+        ;; [[word [beg end]]... ]
+        flatten-terms-vector (loop [result (list)
+                                    rest-terms (terms-iter)]
+                               (let [term-item (first rest-terms)]
+                                 (if term-item
+                                   (let [word (.utf8ToString
+                                               (first term-item))
+                                         positions (second term-item)]
+                                     (recur (concat
+                                             (map #(vector word %)
+                                                  positions)
+                                             result)
+                                            (next rest-terms)))
+                                   result)))
+        ordered-words (sort-by #(-> % second first) flatten-terms-vector)
+        ;; ((["word1" [beg end]] ["word2" [beg end]])... )
+        combinations (concat (partition 3 1 ordered-words)
+                             (partition 2 1 ordered-words))
+        all-phrases (loop [result {}
+                           rest-comb combinations]
+                      (let [comb-item (first rest-comb)]
+                        (if comb-item
+                          (let [stemmed-phrase
+                                (clojure.string/join " " (map first comb-item))
+                                pos-phrase [(-> comb-item
+                                                first
+                                                second
+                                                first)
+                                            (-> comb-item
+                                                last
+                                                second
+                                                second)]]
+                            (recur
+                             (update-in result [stemmed-phrase]
+                                        (fn [x] {:pos (if (:pos x)
+                                                        (cons pos-phrase
+                                                              (:pos x))
+                                                        (list pos-phrase))
+                                                 :count (if (:count x)
+                                                          (+ 1 (:count x))
+                                                          1)}))
+                             (next rest-comb)))
+                          result)))
+        top-phrases (filter (fn [x]
+                              (>= (-> x second :count) top)) all-phrases)]
+    top-phrases))

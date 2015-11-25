@@ -163,6 +163,18 @@
                     (llast phrase-words-positions)])
                  (filter #(not (empty? %)) result))))))))
 
+(defn get-term-iter [terms-enum]
+  "TermsEnum => [term-as-BytesRef [[beg end]... ]] iterator."
+  (letfn
+      [(next-term []
+         (if (.next terms-enum)
+           (get-positions terms-enum :get-term true)))
+       (it [] (let [term (next-term)]
+                (when term
+                  (cons term
+                        (lazy-seq (it))))))]
+    it))
+
 (defn make-dict-searcher [dict]
   "Construct search function on index for passed dictionary.
   Function returns iterator through matches with the following structure:
@@ -187,15 +199,7 @@
                                                       (as-str *field-name*))
                          terms-lenght (.size terms)
                          ^TermsEnum te (.iterator terms)
-                         term-iter (letfn
-                                       [(next-term []
-                                          (if (.next te)
-                                            (get-positions te :get-term true)))
-                                        (it [] (let [term (next-term)]
-                                                 (when term
-                                                   (cons term
-                                                         (lazy-seq (it))))))]
-                                     it)
+                         term-iter (get-term-iter te)
                          result (filter
                                  #(not (nil? %))
                                  (concat
