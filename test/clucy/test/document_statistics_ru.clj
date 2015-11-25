@@ -37,4 +37,14 @@
                         (add (set-field-params
                               clucy.test.positions-searcher-ru/test-text
                               {:positions-offsets true})))]
-            (get-top-phrases index 3)))))))
+            (get-top-phrases index 3))))))
+
+  (testing "get-word-count fn"
+    (is
+     (= 30
+        (binding [*analyzer* (make-analyzer :class :ru)]
+          (let [index (doto (memory-index)
+                        (add (set-field-params
+                              clucy.test.positions-searcher-ru/test-text
+                              {:positions-offsets true})))]
+            (get-word-count index)))))))

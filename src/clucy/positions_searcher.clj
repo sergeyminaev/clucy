@@ -163,6 +163,18 @@
                     (llast phrase-words-positions)])
                  (filter #(not (empty? %)) result))))))))
 
+
+(defn get-terms-enum [index]
+  "Index => [TermsEnum size]."
+  (let [docID 0
+        ^IndexReader reader (index-reader index)
+        ^Terms terms (.getTermVector reader
+                                     docID
+                                     (as-str *field-name*))
+        terms-lenght (.size terms)
+        ^TermsEnum te (.iterator terms)]
+    [te terms-lenght]))
+
 (defn get-term-iter [terms-enum]
   "TermsEnum => [term-as-BytesRef [[beg end]... ]] iterator."
   (letfn
@@ -182,8 +194,7 @@
 
   When *with-stemmed* is true, the iteratior item is the following:
   [stemmed-word [start-offset end-offset]]"
-  (let [docID 0
-        phrases (into #{} (filter #(.contains % " ") dict))
+  (let [phrases (into #{} (filter #(.contains % " ") dict))
         words (clojure.set/difference dict phrases)
         search-words (stemming-dict words)
         search-phrases (stemming-phrases phrases)
@@ -193,12 +204,7 @@
         dict-lenght (count words)
         with-stemmed *with-stemmed*
         searcher (fn [^org.apache.lucene.store.Directory index]
-                   (let [^IndexReader reader (index-reader index)
-                         ^Terms terms (.getTermVector reader
-                                                      docID
-                                                      (as-str *field-name*))
-                         terms-lenght (.size terms)
-                         ^TermsEnum te (.iterator terms)
+                   (let [[te terms-lenght] (get-terms-enum index)
                          term-iter (get-term-iter te)
                          result (filter
                                  #(not (nil? %))

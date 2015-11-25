@@ -8,17 +8,22 @@
                             TermsEnum
                             PostingsEnum)))
 
+(defn get-word-count [index]
+  "Number of words in index."
+  (let [[te _ ] (pos/get-terms-enum index)]
+    (loop [word-count 0]
+      (if (.next te)
+        (let [^PostingsEnum pe (.postings te nil)]
+          (.nextDoc pe)
+          (recur (+ word-count (.freq pe))))
+        word-count))))
+
 (defn get-top-words-iterator [index & [top]]
   "Return iterator through words in index with the frequency
 (amount of appearance in text).
 Use top to limit words with frequency higher or equal to it.
 Iterator item structure: [word frequency]."
-  (let [docID 0
-        ^IndexReader reader (index-reader index)
-        ^Terms terms (.getTermVector reader
-                                     docID
-                                     (as-str *field-name*))
-        ^TermsEnum te (.iterator terms)]
+  (let [[te _ ] (pos/get-terms-enum index)]
     (letfn [(next-terms-enum []
               (if (.next te)
                 (let [^PostingsEnum pe (.postings te nil)]
@@ -35,12 +40,7 @@ Iterator item structure: [word frequency]."
 (defn get-top-phrases [index & [top]]
   "Return top most common phrases in index.
 Output structure: ([phrase {:pos [beg end] :count frequency}]... )"
-  (let [docID 0
-        ^IndexReader reader (index-reader index)
-        ^Terms terms (.getTermVector reader
-                                     docID
-                                     (as-str *field-name*))
-        ^TermsEnum te (.iterator terms)
+  (let [[te _ ] (pos/get-terms-enum index)
         ;; [[term-as-BytesRef [[beg end]... ]]... ]
         terms-iter (pos/get-term-iter te)
         ;; [[word [beg end]]... ]
