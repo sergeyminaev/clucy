@@ -26,10 +26,12 @@ Iterator item structure: [word frequency]."
   (let [[te _ ] (pos/get-terms-enum index)]
     (letfn [(next-terms-enum []
               (if (.next te)
-                (let [^PostingsEnum pe (.postings te nil)]
-                  (.nextDoc pe)
-                  (if (or (nil? top) (>= (.freq pe) top))
-                    [(.utf8ToString (.term te)) (.freq pe)]
+                (let [[term pos freq] (pos/get-positions te
+                                                         :get-term  true
+                                                         :get-freq  true
+                                                         :to-string true)]
+                  (if (or (nil? top) (>= freq top))
+                    [term {:count freq :pos pos}]
                     (recur)))))
             (it [] (let [term-freq (next-terms-enum)]
                      (when term-freq
@@ -77,13 +79,13 @@ Output structure: ([phrase {:pos [beg end] :count frequency}]... )"
                                                 second)]]
                             (recur
                              (update-in result [stemmed-phrase]
-                                        (fn [x] {:pos (if (:pos x)
+                                        (fn [x] {:count (if (:count x)
+                                                          (+ 1 (:count x))
+                                                          1)
+                                                 :pos (if (:pos x)
                                                         (cons pos-phrase
                                                               (:pos x))
-                                                        (list pos-phrase))
-                                                 :count (if (:count x)
-                                                          (+ 1 (:count x))
-                                                          1)}))
+                                                        (list pos-phrase))}))
                              (next rest-comb)))
                           result)))
         top-phrases (filter (fn [x]

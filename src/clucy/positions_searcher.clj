@@ -77,27 +77,35 @@
                          phrase-words)))
                  (map #(.split % " ") dict-phrases-set))))
 
-(defn- get-positions [^TermsEnum te & {:keys [get-term]
-                                       :or {get-term false}}]
+(defn get-positions [^TermsEnum te & {:keys [get-term
+                                             get-freq
+                                             to-string]
+                                      :or {get-term false
+                                           get-freq false
+                                           to-string false}}]
   "When get-term is true return term itself with its positions
   [term-as-BytesRef [[beg end]... ]]
 
   Return term positions otherwise
   [[beg end]... ]"
-  (let [positions (let [^PostingsEnum pe (.postings te nil)]
-                    (.nextDoc pe)
-                    (loop [positions []]
-                      (if (try (.nextPosition pe)
-                               true
-                               (catch Exception e
-                                 false))
-                        (recur (cons [(.startOffset pe)
-                                      (.endOffset pe)]
-                                     positions))
-                        positions)))]
-    (if get-term
-      [(.term te) positions]
-      positions)))
+  (let [pe ^PostingsEnum (doto (.postings te nil)
+                           (.nextDoc))
+        positions (loop [positions []]
+                    (if (try (.nextPosition pe)
+                             true
+                             (catch Exception e
+                               false))
+                      (recur (cons [(.startOffset pe)
+                                    (.endOffset pe)]
+                                   positions))
+                      positions))
+        term-repr (if get-term
+                    (if to-string (.utf8ToString (.term te)) (.term te)))]
+    (cond
+      (and get-term get-freq) [term-repr positions (.freq pe)]
+      get-term [term-repr positions]
+      get-freq [positions (.freq pe)]
+      :else positions)))
 
 (defn- filter-near-to [;; Already founded words position -
                        ;; first words in the phrase
