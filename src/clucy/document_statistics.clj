@@ -22,7 +22,7 @@
   "Return iterator through words in index with the frequency
 (amount of appearance in text).
 Use top to limit words with frequency higher or equal to it.
-Iterator item structure: [word frequency]."
+Iterator item structure: [word {:pos [beg end] :count frequency}]."
   (let [[te _ ] (pos/get-terms-enum index)]
     (letfn [(next-terms-enum []
               (if (.next te)
@@ -38,6 +38,11 @@ Iterator item structure: [word frequency]."
                        (cons term-freq
                              (lazy-seq (it))))))]
       it)))
+
+(defn get-top-words [index & [top]]
+  "Return top most common words in index.
+Output structure: ([word {:pos [beg end] :count frequency}]... )"
+  ((get-top-words-iterator index top)))
 
 (defn get-top-phrases [index & [top]]
   "Return top most common phrases in index.

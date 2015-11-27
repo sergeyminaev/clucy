@@ -6,7 +6,7 @@
   (:require clucy.test.positions-searcher-ru))
 
 (deftest document-statistics
-  (testing "stemming-dict fn"
+  (testing "get-top-words-iterator fn"
     (is
      (= '(["джек" {:count 3, :pos ([249 253] [116 120] [28 32])}]
           ["дом" {:count 3, :pos ([224 228] [91 95] [4 7])}]
@@ -25,7 +25,18 @@
                 iterator (get-top-words-iterator index 2)]
             (iterator))))))
 
-  (testing "stemming-dict fn"
+  (testing "get-top-words fn"
+    (is
+     (= '(["котор"
+           {:count 6, :pos ([232 239] [187 194] [155 162] [99 106] [54 61] [11 18])}])
+        (binding [*analyzer* (make-analyzer :class :ru)]
+          (let [index (doto (memory-index)
+                        (add (set-field-params
+                              clucy.test.positions-searcher-ru/test-text
+                              {:positions-offsets true})))]
+            (get-top-words index 6))))))
+
+  (testing "get-top-phrases fn"
     (is
      (= '(["дом котор" {:count 3, :pos ([224 239] [91 106] [4 18])}]
           ["котор постро джек" {:count 3, :pos ([232 253] [99 120] [11 32])}]
