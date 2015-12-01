@@ -183,7 +183,7 @@
         ^TermsEnum te (.iterator terms)]
     [te terms-lenght]))
 
-(defn get-term-iter [terms-enum]
+(defn get-term-iter [^TermsEnum terms-enum]
   "TermsEnum => [term-as-BytesRef [[beg end]... ]] iterator."
   (letfn
       [(next-term []
@@ -212,7 +212,7 @@
         dict-lenght (count words)
         with-stemmed *with-stemmed*
         searcher (fn [^org.apache.lucene.store.Directory index]
-                   (let [[te terms-lenght] (get-terms-enum index)
+                   (let [[^TermsEnum te terms-lenght] (get-terms-enum index)
                          term-iter (get-term-iter te)
                          result (filter
                                  #(not (nil? %))
