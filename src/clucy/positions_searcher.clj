@@ -147,7 +147,7 @@
 (defn- find-phrase [^clojure.lang.PersistentVector phrase
                     ^TermsEnum te]
   "Phrase position searching."
-  (let [first-positions (if (.seekExact te (first phrase))
+  (let [first-positions (if (and te (.seekExact te (first phrase)))
                           (get-positions te))]
     (if first-positions
       (loop [words (next phrase)
@@ -179,15 +179,15 @@
         ^Terms terms (.getTermVector reader
                                      docID
                                      (as-str *field-name*))
-        terms-lenght (.size terms)
-        ^TermsEnum te (.iterator terms)]
+        terms-lenght (if terms (.size terms) 0)
+        ^TermsEnum te (if terms (.iterator terms))]
     [te terms-lenght]))
 
 (defn get-term-iter [^TermsEnum terms-enum]
   "TermsEnum => [term-as-BytesRef [[beg end]... ]] iterator."
   (letfn
       [(next-term []
-         (if (.next terms-enum)
+         (if (and terms-enum (.next terms-enum))
            (get-positions terms-enum :get-term true)))
        (it [] (let [term (next-term)]
                 (when term
