@@ -22,7 +22,8 @@
    (org.apache.lucene.analysis.de GermanAnalyzer)
    (org.apache.lucene.analysis.en EnglishAnalyzer)
    (org.apache.lucene.analysis.fr FrenchAnalyzer)
-   (org.apache.lucene.analysis.ru RussianAnalyzer)
+   (org.apache.lucene.analysis.ru RussianAnalyzer
+                                  RussianLightStemmer)
    (org.apache.lucene.analysis.core LowerCaseFilter
                                     StopFilter
                                     WhitespaceTokenizer
