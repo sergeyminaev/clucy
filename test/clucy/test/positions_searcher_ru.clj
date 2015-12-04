@@ -41,7 +41,15 @@
     (is
      (= "пшениц"
         (binding [*analyzer* (make-analyzer :class :ru)]
-          (stemming-word "пшеница")))))
+          (stemming-word "пшеница"))))
+    (is
+     (= "ива"
+        (binding [*analyzer* (make-analyzer :stemmer :ru)]
+          (stemming-word "Иван"))))
+    (is
+     (= "иван"
+        (binding [*analyzer* (make-analyzer :stemmer :ru-light)]
+          (stemming-word "Иван")))))
 
   (testing "stemming-phrases fn"
     (is

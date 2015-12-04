@@ -1,4 +1,5 @@
 (ns clucy.analyzers
+  (:use clucy.util)
   (:require [clojure.java.io :as io])
   (:import
    (java.io InputStream)
@@ -19,11 +20,14 @@
    (org.apache.lucene.analysis.snowball SnowballFilter)
    (org.apache.lucene.analysis.ar ArabicAnalyzer)
    (org.apache.lucene.analysis.bg BulgarianAnalyzer)
-   (org.apache.lucene.analysis.de GermanAnalyzer)
-   (org.apache.lucene.analysis.en EnglishAnalyzer)
-   (org.apache.lucene.analysis.fr FrenchAnalyzer)
+   (org.apache.lucene.analysis.de GermanAnalyzer
+                                  GermanLightStemFilter)
+   (org.apache.lucene.analysis.en EnglishAnalyzer
+                                  EnglishMinimalStemFilter)
+   (org.apache.lucene.analysis.fr FrenchAnalyzer
+                                  FrenchLightStemFilter)
    (org.apache.lucene.analysis.ru RussianAnalyzer
-                                  RussianLightStemmer)
+                                  RussianLightStemFilter)
    (org.apache.lucene.analysis.core LowerCaseFilter
                                     StopFilter
                                     WhitespaceTokenizer
@@ -69,7 +73,10 @@
    :fr FrenchStemmer
    :de GermanStemmer
    :ru RussianStemmer
-   :ru-light RussianLightStemmer})
+   :en-min EnglishMinimalStemFilter
+   :fr-light FrenchLightStemFilter
+   :de-light GermanLightStemFilter
+   :ru-light RussianLightStemFilter})
 
 (defn- build-analyzer
   ([analyzer-class]
@@ -142,9 +149,18 @@
                               (SetKeywordMarkerFilter. result stem-exclusion-words)
                               result)
                      result (if stemmer
-                              (SnowballFilter.
-                               result
-                               (.newInstance (stemmers-class-map stemmer)))
+                              ;; for light stemmers
+                              (if (or (ends-with (name stemmer) "light")
+                                      (ends-with (name stemmer) "min"))
+                                (.newInstance
+                                 (.getConstructor
+                                  (stemmers-class-map stemmer)
+                                  (into-array [TokenStream]))
+                                 (into-array [result]))
+                                ;; for snowball stemmers
+                                (SnowballFilter.
+                                 result
+                                 (.newInstance (stemmers-class-map stemmer))))
                               result)]
                  (org.apache.lucene.analysis.Analyzer$TokenStreamComponents.
                   source result)))))]

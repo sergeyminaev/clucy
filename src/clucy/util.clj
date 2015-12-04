@@ -42,3 +42,9 @@
 
 (defn file? [arg]
   (instance? java.io.File arg))
+
+(defn ends-with [s tail]
+  (let [lt (count tail)
+        ls (count s)]
+    (and (>= ls lt)
+         (= (subs s (- ls lt)) tail))))
