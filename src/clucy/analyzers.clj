@@ -67,7 +67,8 @@
   {:en EnglishStemmer
    :fr FrenchStemmer
    :de GermanStemmer
-   :ru RussianStemmer})
+   :ru RussianStemmer
+   :ru-light RussianLightStemmer})
 
 (defn- build-analyzer
   ([analyzer-class]
