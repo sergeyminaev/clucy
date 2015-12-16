@@ -75,7 +75,7 @@
                    (doall
                     (map #(stemming-word %)
                          phrase-words)))
-                 (map #(.split % " ") dict-phrases-set))))
+                 (map #(.split % "[ -]") dict-phrases-set))))
 
 (defn get-positions [^TermsEnum te & {:keys [get-term
                                              get-freq
@@ -135,9 +135,13 @@
                            start (first tp)
                            ;; The end (end-offset) of the previous (last)
                            ;; matched word of the phrase in text
-                           end (llast pp)]
-                       (< (Math/abs (- start end))
-                          *words-distance-in-phrase*)))
+                           end (llast pp)
+                           delta (Math/abs (- start end))]
+                       (and
+                        ;; If phrase is a double word e.g. "green green" -
+                        ;; we find the same word
+                        (not (>= (-> pp last first) start))
+                        (< delta *words-distance-in-phrase*))))
                    this-position))]
              (if next-pos
                (recur (next pps) (cons (conj pp next-pos) result))
@@ -202,10 +206,12 @@
 
   When *with-stemmed* is true, the iteratior item is the following:
   [stemmed-word [start-offset end-offset]]"
-  (let [phrases (into #{} (filter #(.contains % " ") dict))
+  (let [phrases (into #{} (filter #(or (.contains % " ")
+                                       (.contains % "-")) dict))
         words (clojure.set/difference dict phrases)
-        search-words (stemming-dict words)
-        search-phrases (stemming-phrases phrases)
+        search-words (clojure.set/union (stemming-dict words) words)
+        search-phrases (clojure.set/union (stemming-phrases phrases)
+                                          (map #(.split % "[ -]") phrases))
         br-words (map #(BytesRef. %) search-words)
         br-phrases (map (fn [phrase] (map #(BytesRef. %) phrase)) search-phrases)
         iwords (into #{} br-words)
@@ -256,7 +262,10 @@
   When *with-stemmed* is true return [[matched-text stemmed-text beg]... ],
   assume first argument has [[stemmed-word [start-offset end-offset]]... ]
   structure."
-  (let [positions (sort-by first positions)]
+  (let [get-first (if *with-stemmed*
+                    (fn [x] (-> x second first))
+                    (fn [x] (first x)))
+        positions (sort-by get-first positions)]
     (cond
       ;; ---
       (string? text-data)
