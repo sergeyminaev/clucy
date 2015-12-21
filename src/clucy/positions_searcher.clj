@@ -37,6 +37,11 @@
   structure."
   false)
 
+(def ^{:dynamic true}
+  *phrase-separator-regex*
+  "Used to determine phrases in dictionary and separate words in phrase."
+  " ")
+
 (defn stemming-text [^String text
                      & {:keys [format] :or {format #{}}}]
   "Convert words from text into stemmed form according to *analyzer*."
@@ -75,7 +80,7 @@
                    (doall
                     (map #(stemming-word %)
                          phrase-words)))
-                 (map #(.split % "[ -]") dict-phrases-set))))
+                 (map #(.split % *phrase-separator-regex*) dict-phrases-set))))
 
 (defn get-positions [^TermsEnum te & {:keys [get-term
                                              get-freq
@@ -206,12 +211,12 @@
 
   When *with-stemmed* is true, the iteratior item is the following:
   [stemmed-word [start-offset end-offset]]"
-  (let [phrases (into #{} (filter #(or (.contains % " ")
-                                       (.contains % "-")) dict))
+  (let [phrase-sep-pattern (re-pattern *phrase-separator-regex*)
+        phrases (into #{} (filter #(re-find phrase-sep-pattern %)
+                                  dict))
         words (clojure.set/difference dict phrases)
-        search-words (clojure.set/union (stemming-dict words) words)
-        search-phrases (clojure.set/union (stemming-phrases phrases)
-                                          (map #(.split % "[ -]") phrases))
+        search-words (stemming-dict words)
+        search-phrases (stemming-phrases phrases)
         br-words (map #(BytesRef. %) search-words)
         br-phrases (map (fn [phrase] (map #(BytesRef. %) phrase)) search-phrases)
         iwords (into #{} br-words)
@@ -223,7 +228,10 @@
                          result (filter
                                  #(not (nil? %))
                                  (concat
+                                  ;; --------------------
+                                  ;; Single words
                                   (if (< terms-lenght (* dict-lenght 5))
+                                    ;; Iterate through passed text index
                                     (map (fn [[wd ; BytesRef word
                                                ps ; Positions [[beg end]... ]
                                                ]]
@@ -235,6 +243,7 @@
                                                       ps))
                                                ps)))
                                          (term-iter))
+                                    ;; Iterate through dictionary words
                                     (map (fn [br-word word]
                                            (if (.seekExact te br-word)
                                              (if with-stemmed
@@ -243,6 +252,8 @@
                                                     (get-positions te))
                                                (get-positions te))))
                                          br-words search-words))
+                                  ;; --------------------
+                                  ;; Phrases
                                   (map (fn [br-phrase phrase]
                                          (if with-stemmed
                                            (let [phrase-str
