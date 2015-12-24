@@ -24,4 +24,14 @@
      (= #{"алма-ат" "йошкар-ол"}
         (binding [*analyzer* (make-analyzer :tokenizer :whitespace
                                             :stemmer :ru)]
-          (stemming-text "Алма-Ата Йошкар-Ола"))))))
+          (stemming-text "Алма-Ата Йошкар-Ола"))))
+
+    (is
+     (= #{"123" "12"}
+        (binding [*analyzer* (make-analyzer)]
+          (stemming-text "12 123"))))
+    (is
+     (= #{"123"}
+        (binding [*analyzer* (make-analyzer
+                              :length-filter [3 Integer/MAX_VALUE])]
+          (stemming-text "12 123"))))))

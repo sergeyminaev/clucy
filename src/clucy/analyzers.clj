@@ -11,12 +11,14 @@
    (org.apache.lucene.analysis Analyzer
                                TokenStream
                                Tokenizer
+                               TokenFilter
                                CachingTokenFilter)
    (org.apache.lucene.analysis.standard StandardAnalyzer
                                         ClassicAnalyzer
                                         StandardFilter
                                         StandardTokenizer
-                                        ClassicTokenizer)
+                                        ClassicTokenizer
+                                        ClassicFilter)
    (org.apache.lucene.analysis.snowball SnowballFilter)
    (org.apache.lucene.analysis.ar ArabicAnalyzer)
    (org.apache.lucene.analysis.bg BulgarianAnalyzer)
@@ -36,7 +38,8 @@
                                     LowerCaseTokenizer)
    (org.apache.lucene.analysis.path PathHierarchyTokenizer)
    (org.apache.lucene.analysis.wikipedia WikipediaTokenizer)
-   (org.apache.lucene.analysis.miscellaneous SetKeywordMarkerFilter)
+   (org.apache.lucene.analysis.miscellaneous SetKeywordMarkerFilter
+                                             LengthFilter)
    (org.tartarus.snowball.ext EnglishStemmer
                               FrenchStemmer
                               GermanStemmer
@@ -66,6 +69,7 @@
 (def filters-class-map
   {:standard      StandardFilter
    :snowball      SnowballFilter
+   :classic       ClassicFilter
    :caching-token CachingTokenFilter})
 
 (def stemmers-class-map
@@ -104,6 +108,7 @@
     (boolean stop-words) (build-analyzer analyzer-class stop-words)
     :else (build-analyzer analyzer-class)))
 
+
 (defn- get-tokenizer [key-or-object]
   (if (instance? Tokenizer key-or-object)
     key-or-object
@@ -118,14 +123,17 @@
               tokenizer
               filter
               stemmer
-              lower-case] :or {class :basic
-                               version org.apache.lucene.util.Version/LATEST
-                               stop-words nil
-                               stem-exclusion-words nil
-                               tokenizer :standard
-                               filter :standard
-                               stemmer nil
-                               lower-case true}}]
+              lower-case
+              length-filter]
+       :or {class :basic
+            version org.apache.lucene.util.Version/LATEST
+            stop-words nil
+            stem-exclusion-words nil
+            tokenizer :standard
+            filter :standard
+            stemmer nil
+            lower-case true
+            length-filter nil}}]
    (let [analyzer
          (if (not (= :basic class))
            ;; ------------------------------------------------------------
@@ -144,6 +152,10 @@
                                            (into-array [TokenStream]))
                                           (into-array [source]))
                      result (if lower-case (LowerCaseFilter. result) result)
+                     result (if length-filter (LengthFilter.
+                                               result
+                                               (first length-filter)
+                                               (second length-filter)) result)
                      result (if stop-words (StopFilter. result stop-words) result)
                      result (if stem-exclusion-words
                               (SetKeywordMarkerFilter. result stem-exclusion-words)
