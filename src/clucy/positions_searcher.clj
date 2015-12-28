@@ -213,7 +213,7 @@
                         ;; If phrase is a double word e.g. "green green" -
                         ;; we find the same word
                         (not (>= (-> pp last first) (first tp)))
-                        (<= delta *chars-distance-in-phrase*))))
+                        (<= delta (+ 1 *words-distance-in-phrase*)))))
                    this-position))]
              (if next-pos
                (recur (next pps) (cons (conj pp next-pos) result))
