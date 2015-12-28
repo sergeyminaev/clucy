@@ -94,7 +94,8 @@
                           (add (set-field-params
                                 rdr
                                 {:stored false
-                                 :positions-offsets true})))
+                                 :positions-offsets true
+                                 :vector-positions true})))
                   searcher (make-dict-searcher
                             #{"синица"
                               "пшеница"
@@ -102,6 +103,44 @@
                               "построит Джек"})
                   result-iter (searcher index)]
               result-iter)))))
+
+    ;; find phrase by chars distance
+    (is
+     (= nil
+        (with-open [rdr (clojure.java.io/reader
+                         (string->stream
+                          "построил оченьдлинноеслово Джек"))]
+          (binding [*analyzer* (make-analyzer :class :ru)
+                    *find-phrase-by-words-distance* false]
+            (let [index (doto (memory-index)
+                          (add (set-field-params
+                                rdr
+                                {:stored false
+                                 :positions-offsets true})))
+                  searcher (make-dict-searcher
+                            #{"построил Джек"})
+                  result-iter (searcher index)]
+              result-iter)))))
+
+    ;; find phrase by words distance
+    (is
+     (= '([0 31])
+        (with-open [rdr (clojure.java.io/reader
+                         (string->stream
+                          "построил оченьдлинноеслово Джек"))]
+          (binding [*analyzer* (make-analyzer :class :ru)
+                    *find-phrase-by-words-distance* true]
+            (let [index (doto (memory-index)
+                          (add (set-field-params
+                                rdr
+                                {:stored false
+                                 :positions-offsets true
+                                 :vector-positions true})))
+                  searcher (make-dict-searcher
+                            #{"построил Джек"})
+                  result-iter (searcher index)]
+              result-iter)))))
+
     (is
      (= '(["синиц" [145 151]]
           ["пшениц" [176 183]]
@@ -118,7 +157,8 @@
                           (add (set-field-params
                                 rdr
                                 {:stored false
-                                 :positions-offsets true})))
+                                 :positions-offsets true
+                                 :vector-positions true})))
                   searcher (make-dict-searcher
                             #{"синица"
                               "пшеница"
@@ -171,7 +211,8 @@
                             (disk-index (.getAbsolutePath (make-temp-dir))))
                         (add (set-field-params
                               test-text
-                              {:positions-offsets true})))
+                              {:positions-offsets true
+                               :vector-positions true})))
                 searcher (make-dict-searcher
                           #{"синица"
                             "пшеница"
@@ -193,7 +234,8 @@
            (let [index (doto (memory-index)
                          (add (set-field-params
                                test-text
-                               {:positions-offsets true})))
+                               {:positions-offsets true
+                                :vector-positions true})))
                  searcher (make-dict-searcher
                            #{"синица"
                              "пшеница"

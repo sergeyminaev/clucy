@@ -21,10 +21,24 @@
    (org.apache.lucene.analysis.tokenattributes CharTermAttribute)))
 
 (def ^{:dynamic true}
-  *words-distance-in-phrase*
+  *find-phrase-by-words-distance*
+  "When true make-dict-searcher fn searches phrase by words distance
+  (requires set :vector-positions true to index field)
+  and by chars distance otherwise."
+  true)
+
+(def ^{:dynamic true}
+  *chars-distance-in-phrase*
   "Maximum distance (in chars) between words in phrase
   from the end of the previous word to the beginning of the next word."
   10)
+
+(def ^{:dynamic true}
+  *words-distance-in-phrase*
+  "Maximum distance (in words, i.e. terms) between words in phrase.
+  0 - words must be near to other (e.g. first-word second-word).
+  1 - maximum one word between (e.g. first-word else-word second-word)"
+  1)
 
 (def ^{:dynamic true}
   *with-stemmed*
@@ -84,26 +98,38 @@
 
 (defn get-positions [^TermsEnum te & {:keys [get-term
                                              get-freq
-                                             to-string]
+                                             to-string
+                                             vector-pos]
                                       :or {get-term false
                                            get-freq false
-                                           to-string false}}]
-  "When get-term is true return term itself with its positions
-  [term-as-BytesRef [[beg end]... ]]
+                                           to-string false
+                                           vector-pos false}}]
+  "Return term positions in index. Basic result:  [[beg-offset end-offset]... ]
 
-  Return term positions otherwise
-  [[beg end]... ]"
+  Following options adds some
+  :get-term   - when true return term itself with its positions:
+                [term-as-BytesRef [[beg-offset end-offset]... ]]
+  :to-string  - when true return term as string
+  :get-freq   - when true add term frequence:
+                [[[beg-offset end-offset]... ] frequence]
+  :vector-pos - when true add term position (number) in index
+                [[beg-offset end-offset vector-pos]... ]."
   (let [pe ^PostingsEnum (doto (.postings te nil)
                            (.nextDoc))
+        iter (fn [] (try (let [doc-pos (.nextPosition pe)]
+                           doc-pos)
+                         (catch Exception e
+                           false)))
         positions (loop [positions []]
-                    (if (try (.nextPosition pe)
-                             true
-                             (catch Exception e
-                               false))
-                      (recur (cons [(.startOffset pe)
-                                    (.endOffset pe)]
-                                   positions))
-                      positions))
+                    (let [doc-pos (iter)]
+                      (if doc-pos
+                        (recur (cons (let [beg-end [(.startOffset pe)
+                                                    (.endOffset pe)]]
+                                       (if vector-pos
+                                         (conj beg-end doc-pos)
+                                         beg-end))
+                                     positions))
+                        positions)))
         term-repr (if get-term
                     (if to-string (.utf8ToString (.term te)) (.term te)))]
     (cond
@@ -112,7 +138,7 @@
       get-freq [positions (.freq pe)]
       :else positions)))
 
-(defn- filter-near-to [;; Already founded words position -
+(defn- filter-chars-near [;; Already founded words position -
                        ;; first words in the phrase
                        previous-positions
                        ;; Positions vector [[beg end]...] of the next
@@ -140,13 +166,54 @@
                            start (first tp)
                            ;; The end (end-offset) of the previous (last)
                            ;; matched word of the phrase in text
-                           end (llast pp)
+                           end (second (last pp))
                            delta (Math/abs (- start end))]
                        (and
                         ;; If phrase is a double word e.g. "green green" -
                         ;; we find the same word
                         (not (>= (-> pp last first) start))
-                        (< delta *words-distance-in-phrase*))))
+                        (< delta *chars-distance-in-phrase*))))
+                   this-position))]
+             (if next-pos
+               (recur (next pps) (cons (conj pp next-pos) result))
+               (recur (next pps) (cons [] result))))
+           result))))))
+
+(defn filter-word-near [;; Already founded words position -
+                        ;; first words in the phrase
+                        previous-positions
+                        ;; Positions vector [[beg end vector-pos]...]
+                        ;; of the next word in phrase
+                        this-position]
+
+  (if (= previous-positions [])
+    []
+    (filter
+     not-empty
+     (loop [;; Following word positions chain
+            pps previous-positions
+            ;; New filtered chain of matched words of the phrase
+            result []]
+       (let [pp (first pps)]
+         (if pp
+           (let [;; Next word position of the phrase
+                 next-pos
+                 (first
+                  (filter
+                   (fn [;; Matches of the searching word of the phrase
+                        ;; (positions vector [beg end vector-pos])
+                        tp]
+                     (let [;; Word position number of the new word in the text
+                           start (third tp)
+                           ;; Word position number of the previous (last)
+                           ;; matched word of the phrase in text
+                           end (third (last pp))
+                           delta (Math/abs (- start end))]
+                       (and
+                        ;; If phrase is a double word e.g. "green green" -
+                        ;; we find the same word
+                        (not (>= (-> pp last first) (first tp)))
+                        (<= delta *chars-distance-in-phrase*))))
                    this-position))]
              (if next-pos
                (recur (next pps) (cons (conj pp next-pos) result))
@@ -157,14 +224,22 @@
                     ^TermsEnum te]
   "Phrase position searching."
   (let [first-positions (if (and te (.seekExact te (first phrase)))
-                          (get-positions te))]
+                          (get-positions
+                           te
+                           :vector-pos *find-phrase-by-words-distance*))]
     (if first-positions
       (loop [words (next phrase)
              result (map vector first-positions)]
         (let [word (first words)]
           (if word
             (if (.seekExact te word)
-              (let [filtered (filter-near-to result (get-positions te))]
+              (let [filtered (if *find-phrase-by-words-distance*
+                               (filter-word-near result
+                                                 (get-positions
+                                                  te
+                                                  :vector-pos true))
+                               (filter-chars-near result
+                                                  (get-positions te)))]
                 (if (= filtered [])
                   ;; Empty sequence after the last filter iteration -
                   ;; phrase is not found.
@@ -177,9 +252,8 @@
                     (ffirst phrase-words-positions)
                     ;; The end of the last
                     ;; word in the phrase
-                    (llast phrase-words-positions)])
+                    (second (last phrase-words-positions))])
                  (filter #(not (empty? %)) result))))))))
-
 
 (defn get-terms-enum [index]
   "Index => [TermsEnum size]."

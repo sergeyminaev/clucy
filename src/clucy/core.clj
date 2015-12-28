@@ -64,17 +64,19 @@
       #(identity item)) params))
 
 (defn make-field-type [meta-map]
-  (doto (FieldType.)
-    (.setIndexOptions (if (get meta-map :indexed true)
-                        IndexOptions/DOCS
-                        IndexOptions/NONE))
-    (.setStored    (boolean (get meta-map :stored true)))
-    (.setOmitNorms (not (boolean (get meta-map :norms true))))
-    (.setStoreTermVectors       (boolean
-                                 (get meta-map :positions-offsets false)))
-    (.setStoreTermVectorOffsets (boolean
-                                 (get meta-map :positions-offsets false)))))
-
+  (let [stored? (boolean (get meta-map :stored true))
+        omit-norms? (not (boolean (get meta-map :norms true)))
+        positions-offsets? (boolean (get meta-map :positions-offsets false))
+        vector-positions? (boolean (get meta-map :vector-positions false))]
+    (doto (FieldType.)
+      (.setIndexOptions (if (get meta-map :indexed true)
+                          IndexOptions/DOCS
+                          IndexOptions/NONE))
+      (.setStored stored?)
+      (.setOmitNorms omit-norms?)
+      (.setStoreTermVectors (or positions-offsets? vector-positions?))
+      (.setStoreTermVectorOffsets positions-offsets?)
+      (.setStoreTermVectorPositions vector-positions?))))
 
 (defn add-field
   "Add a Field to a Document.
@@ -85,7 +87,9 @@
              the storing of norms.
   :positions-offsets - when true store token positions into the term vector
                        for this field and field's indexed form should be also
-                       stored into term vectors."
+                       stored into term vectors.
+  :vector-positions  - when true store token positions into the term vector
+                       for this field."
   ([document key value]
    (add-field document key value {}))
 

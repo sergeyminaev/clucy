@@ -48,3 +48,6 @@
         ls (count s)]
     (and (>= ls lt)
          (= (subs s (- ls lt)) tail))))
+
+(defmacro third [x]
+  `(get ~x 2))

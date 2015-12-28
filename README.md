@@ -69,7 +69,8 @@ scientists...
         index (doto (memory-index)
                 (add (set-field-params
                       test-text
-                      {:positions-offsets true})))
+                      {:positions-offsets true
+                       :vector-positions true})))
         searcher (make-dict-searcher
                   #{"house"
                     "lay"
