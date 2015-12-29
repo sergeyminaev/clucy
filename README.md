@@ -3,7 +3,7 @@ Clucy
 
 [![License EPL](https://img.shields.io/badge/license-EPL-yellow.svg)](https://www.eclipse.org/legal/epl-v10.html)
 [![Build Status](https://travis-ci.org/kostafey/clucy.svg?branch=master)](https://travis-ci.org/kostafey/clucy)
-[![Clojars Project](https://img.shields.io/clojars/v/org.clojars.kostafey/clucy.svg)](https://clojars.org/org.clojars.kostafey/clucy)
+[![Clojars Project](https://img.shields.io/badge/clojars-clucy-blue.svg)](https://clojars.org/org.clojars.kostafey/clucy)
 
 Clucy is a Clojure interface to [Lucene](http://lucene.apache.org/).
 
@@ -83,6 +83,30 @@ scientists...
 
     => (["house" 12] ["Jack built" 23] ["lay" 95] ["house" 106] ["Jack built" 117])
 
+#### Statistics for single document
+
+```clojure
+(ns example
+  (:use clucy.core
+        clucy.analyzers
+        clucy.document-statistics))
+
+(binding [*analyzer* (make-analyzer :class :en)]
+  (let [index (doto (memory-index)
+                (add (set-field-params
+                      "This is the house that Jack built.
+                       This is the malt
+                       That lay in the house that Jack built."
+                      {:positions-offsets true})))
+        iterator (get-top-words-iterator index 2)]
+    {:word-count (get-word-count index)
+     :most-frequent (iterator)}))
+
+    => {:word-count 8,
+        :most-frequent (["built" {:count 2, :pos ([130 135] [28 33])}]
+                        ["hous" {:count 2, :pos ([114 119] [12 17])}]
+                        ["jack" {:count 2, :pos ([125 129] [23 27])}])}
+```
 
 Storing Fields
 --------------
