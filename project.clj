@@ -1,4 +1,4 @@
-(defproject org.clojars.kostafey/clucy "0.5.4-SNAPSHOT"
+(defproject org.clojars.kostafey/clucy "0.5.4.0"
   :description "A Clojure interface to the Lucene search engine"
   :url "http://github/kostafey/clucy"
   :dependencies [[org.clojure/clojure "1.7.0"]

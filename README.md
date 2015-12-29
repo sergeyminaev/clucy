@@ -3,6 +3,7 @@ Clucy
 
 [![License EPL](https://img.shields.io/badge/license-EPL-yellow.svg)](https://www.eclipse.org/legal/epl-v10.html)
 [![Build Status](https://travis-ci.org/kostafey/clucy.svg?branch=master)](https://travis-ci.org/kostafey/clucy)
+[![Clojars Project](https://img.shields.io/clojars/v/org.clojars.kostafey/clucy.svg)](https://clojars.org/org.clojars.kostafey/clucy)
 
 Clucy is a Clojure interface to [Lucene](http://lucene.apache.org/).
 
@@ -12,7 +13,7 @@ Installation
 To install Clucy, add the following dependency to your `project.clj`
 file:
 
-    [org.clojars.kostafey/clucy "0.5.3-SNAPSHOT"]
+[![Clojars Project](http://clojars.org/org.clojars.kostafey/clucy/latest-version.svg)](http://clojars.org/org.clojars.kostafey/clucy)
 
 Usage
 -----
