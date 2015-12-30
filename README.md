@@ -4,7 +4,7 @@ Clucy
 [![License EPL](https://img.shields.io/badge/license-EPL-yellow.svg)](https://www.eclipse.org/legal/epl-v10.html)
 [![Build Status](https://travis-ci.org/kostafey/clucy.svg?branch=master)](https://travis-ci.org/kostafey/clucy)
 [![Clojars Project](https://img.shields.io/badge/clojars-clucy-blue.svg)](https://clojars.org/org.clojars.kostafey/clucy)
-[![Coverage Status](https://coveralls.io/repos/kostafey/clucy/badge.svg?branch=master&service=github)](https://coveralls.io/github/kostafey/clucy?branch=master)
+[![Coverage Status](https://coveralls.io/repos/kostafey/clucy/badge.svg?branch=master)](https://coveralls.io/github/kostafey/clucy?branch=master)
 [![Dependencies Status](https://jarkeeper.com/kostafey/clucy/status.svg)](https://jarkeeper.com/kostafey/clucy)
 
 Clucy is a Clojure interface to [Lucene](http://lucene.apache.org/).
