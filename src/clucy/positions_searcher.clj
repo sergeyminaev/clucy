@@ -78,8 +78,9 @@
   (let [^String text (clojure.string/join " " dict-words-set)]
     (stemming-text text)))
 
-(defn stemming-word [^String word]
+(defn stemming-word
   "Get stemmed form of word according to *analyzer*."
+  [^String word]
   (let [^TokenStream ts (.tokenStream *analyzer* (as-str *field-name*) word)
         ^CharTermAttribute ta (.addAttribute ts CharTermAttribute)]
     (.reset ts)

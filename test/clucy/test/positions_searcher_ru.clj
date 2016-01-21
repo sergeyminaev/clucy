@@ -194,6 +194,23 @@
                      result-iter (searcher index)]
                  result-iter))))))
 
+  (testing "with disk index"
+    (is
+     (= '([145 151] [176 183] [43 50] [169 183] [19 32] [107 120] [240 253])
+        (binding [*analyzer* (make-analyzer :class :ru)]
+          (with-index [index (doto (disk-index (get-temp-dir))
+                               (add (set-field-params
+                                     test-text
+                                     {:positions-offsets true
+                                      :vector-positions true})))]
+            (let [searcher (make-dict-searcher
+                            #{"синица"
+                              "пшеница"
+                              "воры пшеницы"
+                              "построит Джек"})
+                  result-iter (searcher index)]
+              result-iter))))))
+
   (testing "usage example"
     (is
      (= '(["построил Джек" 19]
@@ -204,23 +221,22 @@
           ["пшеницу" 176]
           ["построил Джек" 240])
         (binding [*analyzer* (make-analyzer :class :ru)]
-          (let [index (doto
-                          (if (< (.length test-text)
-                                 *ram-allocation-threshold*)
-                            (memory-index)
-                            (disk-index (.getAbsolutePath (make-temp-dir))))
-                        (add (set-field-params
-                              test-text
-                              {:positions-offsets true
-                               :vector-positions true})))
-                searcher (make-dict-searcher
-                          #{"синица"
-                            "пшеница"
-                            "воры пшеницы"
-                            "построит Джек"})
-                result-iter (searcher index)]
-            (sort-by second
-                     (show-text-matches result-iter test-text))))))
+          (with-index [index (doto (if (< (.length test-text)
+                                          *ram-allocation-threshold*)
+                                     (memory-index)
+                                     (disk-index (get-temp-dir)))
+                               (add (set-field-params
+                                     test-text
+                                     {:positions-offsets true
+                                      :vector-positions true})))]
+            (let [searcher (make-dict-searcher
+                            #{"синица"
+                              "пшеница"
+                              "воры пшеницы"
+                              "построит Джек"})
+                  result-iter (searcher index)]
+              (sort-by second
+                       (show-text-matches result-iter test-text)))))))
     (is (=
          '(["построил Джек" "постро джек" 19]
            ["пшеница" "пшениц" 43]

@@ -13,6 +13,11 @@
        temp-file)))
   ([] (make-temp-dir "lucene")))
 
+(defn ^String get-temp-dir
+  ([^String prefix]
+   (.getAbsolutePath (make-temp-dir prefix)))
+  ([] (.getAbsolutePath (make-temp-dir))))
+
 (defn llast [x]
   (-> x last last))
 

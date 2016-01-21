@@ -17,7 +17,8 @@
                                                SimpleHTMLFormatter)
            (org.apache.lucene.util Version AttributeSource)
            (org.apache.lucene.store NIOFSDirectory RAMDirectory Directory))
-  (:use [clucy.util :only (reader? file?)]))
+  (:use [clucy.util :only (reader? file?)])
+  (:require [me.raynes.fs :as fs]))
 
 (def ^{:dynamic true} *version* Version/LUCENE_CURRENT)
 (def ^{:dynamic true} *analyzer* (StandardAnalyzer.))
@@ -43,6 +44,27 @@
   [^String dir-path]
   (NIOFSDirectory.
    (Paths/get (URI. (str "file:///" dir-path)))))
+
+(defmacro with-index
+  "bindings => [name init ...]
+
+  Evaluates body in a try expression with names bound to the values
+  of the inits, and a finally clause delete index directories
+  (if it's a disk index) on each index in reverse order."
+  [bindings & body]
+  (assert (vector? bindings) "a vector for its binding")
+  (assert (even? (count bindings)) "an even number of forms in binding vector")
+  (cond
+    (= (count bindings) 0) `(do ~@body)
+    (symbol? (bindings 0)) `(let ~(subvec bindings 0 2)
+                              (try
+                                (with-index ~(subvec bindings 2) ~@body)
+                                (finally
+                                  (if (instance? NIOFSDirectory ~(bindings 0))
+                                    (fs/delete-dir
+                                     (. ~(bindings 0) getDirectory))))))
+    :else (throw (IllegalArgumentException.
+                  "with-index only allows Symbols in bindings"))))
 
 (defn index-writer
   "Create an IndexWriter."
@@ -150,7 +172,7 @@
   "Create a Document from java.io.File."
   [s]
   (let [document (Document.)]
-    (with-open [rdr (clojure.java.io/reader s)]
+    (with-open [rdr (clojure.java.io/reader (s))]
       (add-field document
                  *field-name*
                  rdr
