@@ -60,7 +60,8 @@
                               (try
                                 (with-index ~(subvec bindings 2) ~@body)
                                 (finally
-                                  (if (instance? NIOFSDirectory ~(bindings 0))
+                                  (if (and (instance? NIOFSDirectory ~(bindings 0))
+                                           (fs/exists? (. ~(bindings 0) getDirectory)))
                                     (fs/delete-dir
                                      (. ~(bindings 0) getDirectory))))))
     :else (throw (IllegalArgumentException.
@@ -83,7 +84,8 @@
   (with-meta
     (if (instance? clojure.lang.IObj item)
       item
-      #(identity item)) params))
+      #(identity item))
+    params))
 
 (defn make-field-type [meta-map]
   (let [stored? (boolean (get meta-map :stored true))
@@ -168,17 +170,6 @@
                (meta s))
     document))
 
-(defn- file->document
-  "Create a Document from java.io.File."
-  [s]
-  (let [document (Document.)]
-    (with-open [rdr (clojure.java.io/reader (s))]
-      (add-field document
-                 *field-name*
-                 rdr
-                 (meta s)))
-    document))
-
 (defn add
   "Add hash-maps to the search index."
   [index & items]
@@ -195,9 +186,13 @@
         (and (fn? i) (reader? (i))) (.addDocument
                                      writer
                                      (string->document i))
-        (and (fn? i) (file? (i))) (.addDocument
+        (and (fn? i) (file? (i))) (with-open [rdr (clojure.java.io/reader (i))]
+                                    (.addDocument
                                      writer
-                                     (file->document i))))))
+                                     (string->document
+                                      (with-meta
+                                        #(identity rdr)
+                                        (meta i)))))))))
 
 (defn delete
   "Deletes hash-maps from the search index."
