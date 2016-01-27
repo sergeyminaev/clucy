@@ -2,7 +2,8 @@
   (:import
    (java.io File
             ByteArrayInputStream)
-   (java.nio.charset StandardCharsets)))
+   (java.nio.charset StandardCharsets)
+   (org.apache.lucene.store NIOFSDirectory)))
 
 (defn ^File make-temp-dir
   ([^String prefix]
@@ -47,6 +48,9 @@
 
 (defn file? [arg]
   (instance? java.io.File arg))
+
+(defn file-index? [arg]
+  (instance? NIOFSDirectory arg))
 
 (defn ends-with [s tail]
   (let [lt (count tail)
