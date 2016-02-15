@@ -69,4 +69,26 @@
       (is (== 1 (count (search index "m*" 10 :page 1 :results-per-page 3))))
       (is (empty? (intersection
                     (set (search index "m*" 10 :page 0 :results-per-page 3))
-                    (set (search index "m*" 10 :page 1 :results-per-page 3))))))))
+                    (set (search index "m*" 10 :page 1 :results-per-page 3)))))))
+
+  (testing "Explanations"
+    (let [i (memory-index)]
+      (apply add i people)
+      (let [exp (-> (search i "Miles" 10 :explain true)
+                    (first)
+                    (meta)
+                    (:explain))]
+        (is (map? exp))
+        (is (:match? exp))
+        (is (string? (:description exp)))
+        (is (float? (:value exp)))
+        (is (seq? (:children exp))))))
+
+  (testing "Boosting"
+    (let [i (memory-index)]
+      (add i
+           (with-meta {:planet "Earth Mk. II" :designer "Slartibartfast"}
+             {:name {:boost 0.0}})
+           (with-meta {:planet "Earth" :designer "Slartibartfast"}
+             {:name {:boost 1.0}}))
+      (is (= "Earth" (:planet (first (search i "Slartibartfast" 2))))))))
