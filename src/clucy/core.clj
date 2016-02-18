@@ -19,7 +19,8 @@
            (org.apache.lucene.util Version AttributeSource)
            (org.apache.lucene.store NIOFSDirectory RAMDirectory Directory))
   (:use [clucy.util :only (reader? file?)])
-  (:require [me.raynes.fs :as fs]))
+  (:require [me.raynes.fs :as fs]
+            [clojure.string :as string]))
 
 (def ^{:dynamic true} *version* Version/LUCENE_CURRENT)
 (def ^{:dynamic true} *analyzer* (StandardAnalyzer.))
@@ -127,6 +128,45 @@
              (.setBoost field boost))
            field))))
 
+(defn- ->value-or-vector 
+  "If the given map contains the key it returns a vector of current 
+  values corresponding to the key with value appended to it."
+  [in-map key value]
+  (if (contains? in-map key)
+    (let [existing-value (get in-map key)]
+      (if (vector? existing-value)
+        (into existing-value [value])
+        [existing-value value]))
+    value))
+
+(defn- nested-map->dotted-key 
+  "Converts a nested map into a single level map keywords being dotted.
+  {:a {:b {:c 3} :d 2} :h 1} -> {:a.b.c 3 :a.d 2 :h 1}"
+  [a-map]
+  (let [r (reduce (fn [result [k v]]
+                  (if-not (map? v)
+                    {:result (assoc (:result result)
+                                    k v)
+                     :changed (:changed result)}
+                    (let [m (into {} (map (fn [[a-k a-v]]
+                                            [(keyword (str (as-str k) "." 
+                                                           (as-str a-k))) a-v])
+                                          v))]
+                      {:result (merge (:result result)
+                                      m)
+                       :changed true}))) {:result {} :changed false} a-map)]
+    (if (:changed r)
+      (nested-map->dotted-key (:result r))
+      (:result r))))
+
+(defn- dotted-key->nested-map 
+  "Converts a dotted map into a nested map.
+  {:a.b.c 3 :a.d 2 :h 1} -> {:a {:b {:c 3} :d 2} :h 1}"
+  [dotted-map]
+  (reduce (fn [r [k v]]
+            (assoc-in r (into [] (map keyword (string/split (as-str k) #"\."))) 
+                        v)) {} dotted-map))
+
 (defn- map-stored
   "Returns a hash-map containing all of the values in the map that
   will be stored in the search index."
@@ -142,16 +182,18 @@
 (defn- concat-values
   "Concatenate all the maps values being stored into a single string."
   [map-in]
-  (apply str (interpose " " (vals (map-stored map-in)))))
+  ;; flattening the values as they might contain vectors
+  (apply str (interpose " " (flatten (vals (map-stored map-in))))))
 
 (defn- map->document
   "Create a Document from a map."
-  [map]
+  [a-map]
   (let [document (Document.)]
-    (doseq [[key value] map]
-      (add-field document key (as-str value) (key (meta map))))
+    (doseq [[key value] (nested-map->dotted-key a-map)]
+      (doall (map #(add-field document key (as-str %) (key (meta a-map))) 
+                  (if-not (vector? value) [value] value))))
     (if *content*
-      (add-field document :_content (concat-values map)))
+      (add-field document :_content (concat-values a-map)))
     document))
 
 (defn- set->document
@@ -216,11 +258,14 @@
     (doseq [m maps]
       (let [query (BooleanQuery.)]
         (doseq [[key value] m]
-          (.add query
-                (BooleanClause.
-                 (TermQuery. (Term. (.toLowerCase (as-str key))
-                                    (.toLowerCase (as-str value))))
-                 BooleanClause$Occur/MUST)))
+          (doall (map #(.add query
+                     (BooleanClause.
+                       (TermQuery. (Term. (.toLowerCase (as-str key))
+                                          (.toLowerCase (as-str %))))
+                       BooleanClause$Occur/MUST))
+                      (if-not (vector? value)
+                        [value]
+                        value))))
         (.deleteDocuments writer (into-array [query]))))))
 
 (defn- document->map
@@ -230,13 +275,19 @@
   ([^Document document score highlighter]
      (document->map document score (constantly nil) nil))
   ([^Document document score highlighter explanation]
-     (let [m (into {} (for [^Field f (.getFields document)]
-                        [(keyword (.name f)) (.stringValue f)]))
-           fragments (highlighter m) ; so that we can highlight :_content
-           m (dissoc m :_content)]
-       (with-meta
-         m
-         (conj
+    (let [m (dotted-key->nested-map 
+              (reduce (fn [a-map field]
+                        (let [field-name (keyword (.name field))
+                              field-value (.stringValue field)]
+                          (assoc a-map field-name
+                                 (->value-or-vector a-map 
+                                                    field-name field-value))))
+                      {} (.getFields document)))
+          fragments (highlighter m) ; so that we can highlight :_content
+          m (dissoc m :_content)]
+      (with-meta
+        m
+        (conj
           (-> (into {}
                     (for [^Field f (.getFields document)
                           :let [field-type (.fieldType f)]]
