@@ -18,17 +18,15 @@
                                                SimpleHTMLFormatter)
            (org.apache.lucene.util Version AttributeSource)
            (org.apache.lucene.store NIOFSDirectory RAMDirectory Directory))
-  (:use [clucy.util :only (reader? file?)])
+  (:use [clucy.util :only (reader? file? as-str
+                           dotted-key-map->nested-key-map 
+                           nested-key-map->dotted-key-map 
+                           get-value-or-vector)])
   (:require [me.raynes.fs :as fs]))
 
 (def ^{:dynamic true} *version* Version/LUCENE_CURRENT)
 (def ^{:dynamic true} *analyzer* (StandardAnalyzer.))
 
-;; To avoid a dependency on either contrib or 1.2+
-(defn as-str ^String [x]
-  (cond
-    (keyword? x) (name x)
-    :default (str x)))
 
 ;; flag to indicate a default "_content" field should be maintained
 (def ^{:dynamic true} *content* true)
@@ -142,16 +140,18 @@
 (defn- concat-values
   "Concatenate all the maps values being stored into a single string."
   [map-in]
-  (apply str (interpose " " (vals (map-stored map-in)))))
+  ;; flattening the values as they might contain vectors
+  (apply str (interpose " " (flatten (vals (map-stored map-in))))))
 
 (defn- map->document
   "Create a Document from a map."
-  [map]
+  [a-map]
   (let [document (Document.)]
-    (doseq [[key value] map]
-      (add-field document key (as-str value) (key (meta map))))
+    (doseq [[key value] (nested-key-map->dotted-key-map a-map)]
+      (dorun (map #(add-field document key (as-str %) (key (meta a-map))) 
+                  (if-not (vector? value) [value] value))))
     (if *content*
-      (add-field document :_content (concat-values map)))
+      (add-field document :_content (concat-values a-map)))
     document))
 
 (defn- set->document
@@ -216,11 +216,14 @@
     (doseq [m maps]
       (let [query (BooleanQuery.)]
         (doseq [[key value] m]
-          (.add query
-                (BooleanClause.
-                 (TermQuery. (Term. (.toLowerCase (as-str key))
-                                    (.toLowerCase (as-str value))))
-                 BooleanClause$Occur/MUST)))
+          (dorun (map #(.add query
+                     (BooleanClause.
+                       (TermQuery. (Term. (.toLowerCase (as-str key))
+                                          (.toLowerCase (as-str %))))
+                       BooleanClause$Occur/MUST))
+                      (if-not (vector? value)
+                        [value]
+                        value))))
         (.deleteDocuments writer (into-array [query]))))))
 
 (defn- document->map
@@ -230,13 +233,20 @@
   ([^Document document score highlighter]
      (document->map document score (constantly nil) nil))
   ([^Document document score highlighter explanation]
-     (let [m (into {} (for [^Field f (.getFields document)]
-                        [(keyword (.name f)) (.stringValue f)]))
-           fragments (highlighter m) ; so that we can highlight :_content
-           m (dissoc m :_content)]
-       (with-meta
-         m
-         (conj
+    (let [m (dotted-key-map->nested-key-map 
+              (reduce (fn [a-map field]
+                        (let [field-name (keyword (.name field))
+                              field-value (.stringValue field)]
+                          (assoc a-map field-name
+                                 (get-value-or-vector a-map 
+                                                    field-name 
+                                                    field-value))))
+                      {} (.getFields document)))
+          fragments (highlighter m) ; so that we can highlight :_content
+          m (dissoc m :_content)]
+      (with-meta
+        m
+        (conj
           (-> (into {}
                     (for [^Field f (.getFields document)
                           :let [field-type (.fieldType f)]]

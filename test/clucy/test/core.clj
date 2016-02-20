@@ -91,4 +91,18 @@
              {:name {:boost 0.0}})
            (with-meta {:planet "Earth" :designer "Slartibartfast"}
              {:name {:boost 1.0}}))
-      (is (= "Earth" (:planet (first (search i "Slartibartfast" 2))))))))
+      (is (= "Earth" (:planet (first (search i "Slartibartfast" 2)))))))
+  (testing "Array fields"
+           (let [i (memory-index)]
+             (add i {:name "Paul"
+                     :likes ["bread" "onions"]})
+             (is (= ["bread" "onions"] (:likes (first 
+                                                 (search i "Paul" 10)))))))
+  (testing "Nested maps"
+           (let [i (memory-index)]
+             (add i {:book {:author {:first-name "Dostoyevsky"
+                                     :last-name "Fyodor"}
+                            :title "Crime and Punishment"}})
+             (is (= {:first-name "Dostoyevsky"
+                     :last-name "Fyodor"}
+                    (:author (:book (first (search i "Crime and Punishment" 10)))))))))
