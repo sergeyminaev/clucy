@@ -258,14 +258,14 @@
 
 (defn get-terms-enum [index]
   "Index => [TermsEnum size]."
-  (let [docID 0
-        ^IndexReader reader (index-reader index)
-        ^Terms terms (.getTermVector reader
-                                     docID
-                                     (as-str *field-name*))
-        terms-lenght (if terms (.size terms) 0)
-        ^TermsEnum te (if terms (.iterator terms))]
-    [te terms-lenght]))
+  (with-open [^IndexReader reader (index-reader index)]
+    (let [docID 0
+          ^Terms terms (.getTermVector reader
+                                       docID
+                                       (as-str *field-name*))
+          terms-lenght (if terms (.size terms) 0)
+          ^TermsEnum te (if terms (.iterator terms))]
+      [te terms-lenght])))
 
 (defn get-term-iter [^TermsEnum terms-enum]
   "TermsEnum => [term-as-BytesRef [[beg end]... ]] iterator."

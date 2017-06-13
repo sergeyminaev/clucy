@@ -104,6 +104,30 @@
                   result-iter (searcher index)]
               result-iter)))))
 
+    (is
+     (= [[1473519 1473540] [1472694 1472712] [800508 800526] [800396 800414]
+         [377255 377273]   [2955561 2955575] [2950435 2950450] [2723804 2723819]
+         [2662401 2662416] [2608846 2608860] [2524337 2524351] [2523385 2523399]
+         [2431274 2431290] [2371039 2371053] [1857830 1857845] [1857430 1857445]
+         [1857275 1857290] [1854984 1854998] [1854450 1854463] [1772234 1772248]
+         [1571487 1571501] [1562498 1562512] [1539636 1539650] [1462403 1462417]
+         [1056870 1056883] [1056436 1056451] [607041 607057] [391036 391050]
+         [271274 271287]  [48398 48421]]
+        (with-open [rdr (clojure.java.io/reader "test/data/book.txt")]
+          (binding [*analyzer* (make-analyzer :class :ru)]
+            (let [index (doto (disk-index (get-temp-dir))
+                          (add (set-field-params
+                                rdr
+                                {:stored false
+                                 :positions-offsets true
+                                 :vector-positions true})))
+                  searcher (make-dict-searcher
+                            #{"доказательства"
+                              "гости стали расходиться"
+                              "непоследовательность"})
+                  result-iter (searcher index)]
+              result-iter)))))
+
     ;; find phrase by chars distance
     (is
      (= nil
