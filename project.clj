@@ -1,6 +1,6 @@
-(defproject org.clojars.kostafey/clucy "0.5.5.1"
+(defproject org.clojars.sergeyminaev/clucy "0.5.5.1"
   :description "A Clojure interface to the Lucene search engine"
-  :url "http://github/kostafey/clucy"
+  :url "http://github/sergeyminaev/clucy"
   :dependencies [[org.clojure/clojure "1.8.0"]
                  [org.apache.lucene/lucene-core "5.5.0"]
                  [org.apache.lucene/lucene-queryparser "5.5.0"]
