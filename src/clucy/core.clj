@@ -127,19 +127,18 @@
   ([^Document document score]
      (document->map document score (constantly nil)))
   ([^Document document score highlighter]
-     (let [m (into {} (for [^Field f (.getFields document)]
-                        [(keyword (.name f)) (.stringValue f)]))
-           fragments (highlighter m) ; so that we can highlight :_content
-           m (dissoc m :_content)]
-       (with-meta
-         m
-         (-> (into {}
-                   (for [^Field f (.getFields document)
-                         :let [field-type (.fieldType f)]]
-                     [(keyword (.name f)) {:stored (.stored field-type)
-                                           :tokenized (.tokenized field-type)}]))
-             (assoc :_fragments fragments :_score score)
-             (dissoc :_content))))))
+   (let [m (into {} (for [^Field f (.getFields document)]
+                      [(keyword (.name f)) (.stringValue f)]))]
+     (-> m
+         (assoc  :_fragments (highlighter m) ; so that we can highlight :_content
+                 :_score score
+                 :_fields (into {}
+                                (for [^Field f (.getFields document)
+                                      :when (not (= (.name f) "_content"))
+                                      :let [field-type (.fieldType f)]]
+                                  [(keyword (.name f)) {:stored (.stored field-type)
+                                                        :tokenized (.tokenized field-type)}])))
+         (dissoc :_content)))))
 
 (defn- make-highlighter
   "Create a highlighter function which will take a map and return highlighted
@@ -188,16 +187,15 @@ fragments."
             highlighter (make-highlighter query searcher highlight)
             start (* page results-per-page)
             end (min (+ start results-per-page) (.totalHits hits))]
-        (doall
-         (with-meta (for [hit (map (partial aget (.scoreDocs hits))
-                                   (range start end))]
-                      (document->map (.doc ^IndexSearcher searcher
-                                           (.doc ^ScoreDoc hit))
-                                     (.score ^ScoreDoc hit)
-
-                                     highlighter))
-           {:_total-hits (.totalHits hits)
-            :_max-score (.getMaxScore hits)}))))))
+        {:_total-hits (.totalHits hits)
+         :_max-score (.getMaxScore hits)
+         :hits (doall
+                (for [hit (map (partial aget (.scoreDocs hits))
+                               (range start end))]
+                  (document->map (.doc ^IndexSearcher searcher
+                                       (.doc ^ScoreDoc hit))
+                                 (.score ^ScoreDoc hit)
+                                 highlighter)))}))))
 
 (defn search-and-delete
   "Search the supplied index with a query string and then delete all
@@ -211,3 +209,25 @@ of the results."
        (let [parser (QueryParser. (as-str default-field) *analyzer*)
              query  (.parse parser query)]
          (.deleteDocuments writer (into-array [query]))))))
+
+(comment
+
+  (def c {:field :_content
+          :max-fragments 5
+          :separator "..."
+          :pre "<b>"
+          :post "</b>"})
+
+  (def i (memory-index))
+
+  (add i {:text "Some text HERE! Русские слова какие-то..."
+          :title "test 1"})
+
+  (add i {:text "aaaa atext HERE!"
+          :title "some test 1"})
+
+  (search i "some" 10 :highlight c)
+  
+  (search i "here" 10 :highlight c)
+
+  )
