@@ -1,4 +1,4 @@
-(ns clucy.test.core
+(ns clucy.core-test
   (:use clucy.core
         clojure.test
         [clojure.set :only [intersection]]))
