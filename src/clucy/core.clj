@@ -4,11 +4,11 @@
            (java.net URI)
            (org.apache.lucene.analysis Analyzer TokenStream)
            (org.apache.lucene.analysis.standard StandardAnalyzer)
-           (org.apache.lucene.document Document Field Field$Index Field$Store)
-           (org.apache.lucene.index IndexWriter IndexReader Term
+           (org.apache.lucene.document Document Field FieldType)
+           (org.apache.lucene.index IndexOptions IndexWriter IndexReader Term
                                     IndexWriterConfig DirectoryReader FieldInfo)
            (org.apache.lucene.queryparser.classic QueryParser)
-           (org.apache.lucene.search BooleanClause BooleanClause$Occur
+           (org.apache.lucene.search BooleanQuery$Builder BooleanClause BooleanClause$Occur
                                      BooleanQuery IndexSearcher Query ScoreDoc
                                      Scorer TermQuery)
            (org.apache.lucene.search.highlight Highlighter QueryScorer
@@ -65,16 +65,13 @@
   ([document key value meta-map]
      (.add ^Document document
            (Field. (as-str key) (as-str value)
-                   (if (false? (:stored meta-map))
-                     Field$Store/NO
-                     Field$Store/YES)
-                   (if (false? (:indexed meta-map))
-                     Field$Index/NO
-                     (case [(false? (:analyzed meta-map)) (false? (:norms meta-map))]
-                       [false false] Field$Index/ANALYZED
-                       [true false] Field$Index/NOT_ANALYZED
-                       [false true] Field$Index/ANALYZED_NO_NORMS
-                       [true true] Field$Index/NOT_ANALYZED_NO_NORMS))))))
+                   (doto (FieldType.)
+                     (.setStored (if (false? (:stored meta-map)) false true))
+                     (.setIndexOptions (if (false? (:indexed meta-map))
+                                         IndexOptions/NONE
+                                         IndexOptions/DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS))
+                     (.setTokenized (if (false? (:analyzed meta-map)) false true))
+                     (.setOmitNorms (if (false? (:norms meta-map)) true false)))))))
 
 (defn- map-stored
   "Returns a hash-map containing all of the values in the map that
@@ -116,14 +113,14 @@
   [index & maps]
   (with-open [^IndexWriter writer (index-writer index)]
     (doseq [m maps]
-      (let [query (BooleanQuery.)]
+      (let [query-builder (BooleanQuery$Builder.)]
         (doseq [[key value] m]
-          (.add query
+          (.add query-builder
                 (BooleanClause.
                  (TermQuery. (Term. (.toLowerCase (as-str key))
                                     (.toLowerCase (as-str value))))
                  BooleanClause$Occur/MUST)))
-        (.deleteDocuments writer (into-array [query]))))))
+        (.deleteDocuments writer (into-array [(.build query-builder)]))))))
 
 (defn- document->map
   "Turn a Document object into a map."

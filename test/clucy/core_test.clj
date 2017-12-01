@@ -42,6 +42,7 @@
   (testing "search-and-delete fn"
     (let [index (memory-index)]
       (doseq [person people] (add index person))
+      (is (< 0 (count (search index "name:mary" 10))))
       (search-and-delete index "name:mary")
       (is (== 0 (count (search index "name:mary" 10))))))
 
