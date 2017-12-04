@@ -22,52 +22,54 @@
 
   (testing "add fn"
     (let [index (memory-index)]
-      (doseq [person people] (add index person))
-      (is (== 1 (count (search index "name:miles" 10))))))
+      (doseq [person people] (add index [person]))
+      (is (== 1 (count (:hits (search index "name:miles"))))))
+    (let [index (memory-index)]
+      (add index people)
+      (is (== 1 (count (:hits (search index "name:miles")))))))
 
   (testing "delete fn"
     (let [index (memory-index)]
-      (doseq [person people] (add index person))
-      (delete index (first people))
-      (is (== 0 (count (search index "name:miles" 10))))))
+      (add index people)
+      (delete index [(first people)])
+      (is (== 0 (count (:hits (search index "name:miles")))))))
 
   (testing "search fn"
     (let [index (memory-index)]
-      (doseq [person people] (add index person))
-      (is (== 1 (count (search index "name:miles" 10))))
-      (is (== 1 (count (search index "name:miles age:100" 10))))
-      (is (== 0 (count (search index "name:miles AND age:100" 10))))
-      (is (== 0 (count (search index "name:miles age:100" 10 :default-operator :and))))))
+      (add index people)
+      (is (== 1 (count (:hits (search index "name:miles")))))
+      (is (== 1 (count (:hits (search index "name:miles age:100")))))
+      (is (== 0 (count (:hits (search index "name:miles AND age:100")))))
+      (is (== 0 (count (:hits (search index "name:miles age:100" {:default-operator :and})))))))
 
   (testing "search-and-delete fn"
     (let [index (memory-index)]
-      (doseq [person people] (add index person))
-      (is (< 0 (count (search index "name:mary" 10))))
-      (search-and-delete index "name:mary")
-      (is (== 0 (count (search index "name:mary" 10))))))
+      (add index people)
+      (is (< 0 (count (:hits (search index "name:mary")))))
+      (search-and-delete index "name:mary" :_content)
+      (is (== 0 (count (:hits (search index "name:mary")))))))
 
   (testing "search fn with highlighting"
     (let [index (memory-index)
           config {:field :name}]
-      (doseq [person people] (add index person))
-      (is (= (map #(-> % meta :_fragments)
-                  (search index "name:mary" 10 :highlight config))
-             ["<b>Mary</b>" "<b>Mary</b> Lou"]))))
+      (add index people)
+      (is (= (:_fragments (search index "name:mary" {:highlight config})))
+          ["<b>Mary</b>" "<b>Mary</b> Lou"])))
 
   (testing "search fn returns scores in metadata"
     (let [index (memory-index)
-          _ (doseq [person people] (add index person))
-          results (search index "name:mary" 10)]
-      (is (true? (every? pos? (map (comp :_score meta) results))))
-      (is (= 2 (:_total-hits (meta results))))
-      (is (pos? (:_max-score (meta results))))
-      (is (= (count people) (:_total-hits (meta (search index "*:*" 2)))))))
+          _ (add index people)
+          results (search index "name:mary")]
+      (is (true? (every? pos? (map :_score (:hits results)))))
+      (is (= 2 (:_total-hits results)))
+      (is (pos? (:_max-score results)))
+      (is (= (count people) (:_total-hits (search index "*:*" 2))))))
 
   (testing "pagination"
     (let [index (memory-index)]
-      (doseq [person people] (add index person))
-      (is (== 3 (count (search index "m*" 10 :page 0 :results-per-page 3))))
-      (is (== 1 (count (search index "m*" 10 :page 1 :results-per-page 3))))
+      (add index people)
+      (is (== 3 (count (:hits (search index "name:m*" {:page 0 :results-per-page 3})))))
+      (is (== 1 (count (:hits (search index "name:m*" {:page 1 :results-per-page 3})))))
       (is (empty? (intersection
-                    (set (search index "m*" 10 :page 0 :results-per-page 3))
-                    (set (search index "m*" 10 :page 1 :results-per-page 3))))))))
+                    (set (:hits (search index "name:m*" {:page 0 :results-per-page 3})))
+                    (set (:hits (search index "name:m*" {:page 1 :results-per-page 3})))))))))
