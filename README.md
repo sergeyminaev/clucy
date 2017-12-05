@@ -73,10 +73,10 @@ Default Search Field
 --------------------
 
 A field called "\_content" that contains all of the map's values is
-stored in the index for each map (excluding fields with {:stored false}
-in the map's metadata). This provides a default field to run all
+stored in the index for each map (excluding fields with `{:stored false}`
+in the `opts` map). This provides a default field to run all
 searches against. Anytime you call the search function without
 providing a default search field "\_content" is used.
 
-This behavior can be disabled by binding *content* to false, you must
+This behavior can be disabled by binding `*content*` to false, you must
 then specify the default search field with every search invocation.
