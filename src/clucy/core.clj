@@ -1,3 +1,4 @@
+
 (ns clucy.core
   (:import (java.io StringReader)
            (java.nio.file Paths)
@@ -143,7 +144,7 @@
 
 (defn- make-highlighter
   "Create a highlighter function which will take a map and return highlighted
-fragments."
+  fragments."
   [^Query query ^IndexSearcher searcher config]
   (if config
     (let [indexReader (.getIndexReader searcher)
@@ -172,7 +173,8 @@ fragments."
   "Search the supplied index with a query string."
   ([index query]
    (search index query {}))
-  ([index query {:keys [max-results highlight default-field default-operator page results-per-page]
+  ([index query {:keys [max-results highlight default-field default-operator
+                        page results-per-page]
                  :or {max-results 100 page 0 results-per-page 100
                       default-field :_content default-operator :or}}]
    (with-open [reader (index-reader index)]

@@ -73,3 +73,23 @@
       (is (empty? (intersection
                     (set (:hits (search index "name:m*" {:page 0 :results-per-page 3})))
                     (set (:hits (search index "name:m*" {:page 1 :results-per-page 3})))))))))
+
+(deftest field-options-test
+  (let [index (memory-index)]
+    (add index
+         [{:id 1
+           :tag "fields stored indexed"
+           :text "By default all fields in a map are stored and indexed."}
+          {:id 2
+           :tag "options argument"
+           :text "If you would like more fine-grained control use"}
+          {:id 3
+           :tag "options"
+           :text "When the map above is saved to the index"}]
+         {:id {:indexed false}
+          :tag {:analyzed false}
+          :text {:stored false}})
+    (is (= (map :id (:hits (search index "text:map")))
+           ["3" "1"]))
+    (is (= (map :id (:hits (search index "tag:options")))
+           ["3"]))))

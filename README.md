@@ -1,7 +1,6 @@
 Clucy
 =====
 
-[![Build Status](https://travis-ci.org/kostafey/clucy.svg?branch=master)](https://travis-ci.org/kostafey/clucy)
 
 Clucy is a Clojure interface to [Lucene](http://lucene.apache.org/).
 
@@ -30,21 +29,23 @@ a folder on disk.
 Next, add Clojure maps to the index:
 
     (clucy/add index
-       {:name "Bob", :job "Builder"}
-       {:name "Donald", :job "Computer Scientist"})
+       [{:name "Bob", :job "Builder"}
+        {:name "Donald", :job "Computer Scientist"]})
 
 You can remove maps just as easily:
 
     (clucy/delete index
-       {:name "Bob", :job "Builder"})
+       [{:name "Bob", :job "Builder"}])
 
 Once maps have been added, the index can be searched:
 
-    user=> (clucy/search index "bob" 10)
-    ({:name "Bob", :job "Builder"})
+    user=> (clucy/search index "bob")
+    {:_total-hits 1
+     :hits ({:name "Bob", :job "Builder"})}
 
-    user=> (clucy/search index "scientist" 10)
-    ({:name "Donald", :job "Computer Scientist"})
+    user=> (clucy/search index "scientist")
+    {:_total-hits 1
+     :hits ({:name "Donald", :job "Computer Scientist"})}
 
 You can search and remove all in one step. To remove all of the
 scientists...
@@ -56,10 +57,10 @@ Storing Fields
 
 By default all fields in a map are stored and indexed. If you would
 like more fine-grained control over which fields are stored and index,
-add this to the meta-data for your map.
+add this to the `opts` argument map.
 
-    (with-meta {:name "Stever", :job "Writer", :phone "555-212-0202"}
-      {:phone {:stored false}})
+    (add [{:name "Stever", :job "Writer", :phone "555-212-0202"}]
+         {:phone {:stored false}})
 
 When the map above is saved to the index, the phone field will be
 available for searching but will not be part of map in the search
